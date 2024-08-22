@@ -97,7 +97,14 @@ function User() {
             <Button variant="contained" color="primary" fullWidth onClick={handleSave} style={{ marginTop: '20px' }}>
                 Save API Key
             </Button>
-            <Button variant="contained" color="secondary" fullWidth onClick={handleDelete} style={{ marginTop: '10px' }}>
+            <Button
+                variant="contained"
+                color="secondary"
+                fullWidth
+                onClick={handleDelete}
+                style={{ marginTop: '10px' }}
+                disabled={!apiKey}
+            >
                 Delete API Key
             </Button>
         </Container>
