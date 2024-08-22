@@ -90,9 +90,7 @@ function Home() {
 
 function App() {
     const theme = useTheme()
-    const [user, setUser] = useState(
-        () => JSON.parse(localStorage.getItem('frugalGptUser')) || null
-    )
+    const [user, setUser] = useState(() => JSON.parse(localStorage.getItem('frugalGptUser')) || null)
     const [anchorEl, setAnchorEl] = useState(null)
     const [open, setOpen] = useState(() => localStorage.getItem('frugalGptSidenav') === 'true')
     const [mode, setMode] = useState(() => localStorage.getItem('frugalGptTheme') || 'system')
