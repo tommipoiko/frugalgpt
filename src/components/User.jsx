@@ -78,7 +78,7 @@ function User({ setMode }) {
         const selectedTheme = event.target.value
         setTheme(selectedTheme)
         setMode(selectedTheme)
-        localStorage.setItem('theme', selectedTheme)
+        localStorage.setItem('frugalGptTheme', selectedTheme)
         if (auth.currentUser) {
             try {
                 await setDoc(doc(db, 'users', auth.currentUser.uid), {

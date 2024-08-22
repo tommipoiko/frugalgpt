@@ -90,10 +90,12 @@ function Home() {
 
 function App() {
     const theme = useTheme()
-    const [user, setUser] = useState(null)
+    const [user, setUser] = useState(
+        () => JSON.parse(localStorage.getItem('frugalGptUser')) || null
+    )
     const [anchorEl, setAnchorEl] = useState(null)
-    const [open, setOpen] = useState(() => localStorage.getItem('sidenav') === 'true')
-    const [mode, setMode] = useState(() => localStorage.getItem('theme') || 'system')
+    const [open, setOpen] = useState(() => localStorage.getItem('frugalGptSidenav') === 'true')
+    const [mode, setMode] = useState(() => localStorage.getItem('frugalGptTheme') || 'system')
     const auth = getAuth()
     const navigate = useNavigate()
     const prefersDarkMode = useMediaQuery('(prefers-color-scheme: dark)')
@@ -101,13 +103,14 @@ function App() {
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
             setUser(currentUser)
+            localStorage.setItem('frugalGptUser', JSON.stringify(currentUser))
             if (currentUser) {
                 const docRef = doc(db, 'users', currentUser.uid)
                 const docSnap = await getDoc(docRef)
                 if (docSnap.exists()) {
                     const userTheme = docSnap.data().theme || 'system'
                     setMode(userTheme)
-                    localStorage.setItem('theme', userTheme)
+                    localStorage.setItem('frugalGptTheme', userTheme)
                 }
             }
         })
@@ -137,17 +140,19 @@ function App() {
     const handleLogout = async () => {
         setAnchorEl(null)
         await signOut(auth)
+        setUser(null)
+        localStorage.removeItem('frugalGptUser')
         navigate('/login')
     }
 
     const toggleDrawerOpen = () => {
         setOpen(true)
-        localStorage.setItem('sidenav', 'true')
+        localStorage.setItem('frugalGptSidenav', 'true')
     }
 
     const toggleDrawerClose = () => {
         setOpen(false)
-        localStorage.setItem('sidenav', 'false')
+        localStorage.setItem('frugalGptSidenav', 'false')
     }
 
     const themeConfig = createTheme({
@@ -171,6 +176,9 @@ function App() {
                         >
                             <MenuIcon />
                         </IconButton>
+                        <Typography variant="h6" noWrap component="div">
+                            FrugalGPT
+                        </Typography>
                         <Box sx={{ flexGrow: 1 }} />
                         <Button color="inherit" href="/" sx={{ marginRight: 2 }}>
                             Home
