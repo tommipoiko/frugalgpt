@@ -2,9 +2,8 @@ import React, { useState } from 'react'
 import {
     TextField, Button, Container, Typography
 } from '@mui/material'
-import {
-    signInWithEmailAndPassword, createUserWithEmailAndPassword, signInWithPopup, GoogleAuthProvider
-} from 'firebase/auth'
+import { signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider } from 'firebase/auth'
+import { Link } from 'react-router-dom'
 import { auth } from '../services/firebase'
 
 function Login() {
@@ -15,14 +14,7 @@ function Login() {
     const handleLogin = async () => {
         try {
             await signInWithEmailAndPassword(auth, email, password)
-        } catch (err) {
-            setError(err.message)
-        }
-    }
-
-    const handleSignUp = async () => {
-        try {
-            await createUserWithEmailAndPassword(auth, email, password)
+            alert('Logged in successfully!')
         } catch (err) {
             setError(err.message)
         }
@@ -32,6 +24,7 @@ function Login() {
         const provider = new GoogleAuthProvider()
         try {
             await signInWithPopup(auth, provider)
+            alert('Logged in with Google!')
         } catch (err) {
             setError(err.message)
         }
@@ -40,7 +33,7 @@ function Login() {
     return (
         <Container maxWidth="sm">
             <Typography variant="h4" component="h1" gutterBottom>
-                Login or Sign Up
+                Login
             </Typography>
             {error && <Typography color="error">{error}</Typography>}
             <TextField
@@ -63,15 +56,17 @@ function Login() {
             <Button variant="contained" color="primary" fullWidth onClick={handleLogin}>
                 Login
             </Button>
-            <Button variant="contained" color="secondary" fullWidth onClick={handleSignUp} style={{ marginTop: '10px' }}>
-                Sign Up
-            </Button>
             <Typography align="center" variant="body2" gutterBottom style={{ marginTop: '20px' }}>
                 OR
             </Typography>
             <Button variant="contained" color="error" fullWidth onClick={handleGoogleLogin}>
                 Sign in with Google
             </Button>
+            <Typography align="center" variant="body2" gutterBottom style={{ marginTop: '20px' }}>
+                New here?
+                {' '}
+                <Link to="/signin">Create an account</Link>
+            </Typography>
         </Container>
     )
 }

@@ -10,6 +10,7 @@ import useMediaQuery from '@mui/material/useMediaQuery'
 import { getAuth, onAuthStateChanged, signOut } from 'firebase/auth'
 import Login from './components/Login'
 import User from './components/User'
+import Signin from './components/Signin' // Import the Signin component
 
 function Home() {
     return (
@@ -131,6 +132,7 @@ function App() {
                 <Route path="/" element={<Home />} />
                 <Route path="/about" element={<About />} />
                 <Route path="/login" element={<Login />} />
+                <Route path="/signin" element={<Signin />} />
                 <Route path="/user" element={<User />} />
             </Routes>
         </ThemeProvider>
