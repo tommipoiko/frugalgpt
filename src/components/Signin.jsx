@@ -49,7 +49,13 @@ function Signin() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
             />
-            <Button variant="contained" color="primary" fullWidth onClick={handleSignUp} style={{ marginTop: '20px' }}>
+            <Button
+                variant="contained"
+                color="primary"
+                fullWidth
+                onClick={handleSignUp}
+                style={{ marginTop: '20px' }}
+            >
                 Sign Up
             </Button>
         </Container>

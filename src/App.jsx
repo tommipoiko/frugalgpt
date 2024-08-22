@@ -42,7 +42,7 @@ function About() {
 function App() {
     const [user, setUser] = useState(null)
     const [anchorEl, setAnchorEl] = useState(null)
-    const [mode, setMode] = useState('system') // Start with system mode
+    const [mode, setMode] = useState(() => localStorage.getItem('theme') || 'system')
     const auth = getAuth()
     const navigate = useNavigate()
     const prefersDarkMode = useMediaQuery('(prefers-color-scheme: dark)')
@@ -56,6 +56,7 @@ function App() {
                 if (docSnap.exists()) {
                     const userTheme = docSnap.data().theme || 'system'
                     setMode(userTheme)
+                    localStorage.setItem('theme', userTheme)
                 }
             }
         })

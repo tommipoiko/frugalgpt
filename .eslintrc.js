@@ -40,7 +40,8 @@ module.exports = {
         'react-hooks/rules-of-hooks': 'error',
         'react-hooks/exhaustive-deps': 'off',
         semi: ['error', 'never'],
-        'comma-dangle': ['error', 'never']
+        'comma-dangle': ['error', 'never'],
+        'max-len': ['error', { code: 100 }]
     },
     settings: {
         react: {

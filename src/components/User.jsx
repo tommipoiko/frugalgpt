@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import {
-    TextField, Button, Container, Typography, Card, CardContent, Grid, FormControl,
-    InputLabel, Select, MenuItem
+    TextField, Button, Container, Typography, Card, CardContent, Grid, FormControl, InputLabel,
+    Select, MenuItem
 } from '@mui/material'
 import {
     doc, getDoc, setDoc, deleteDoc
@@ -78,6 +78,7 @@ function User({ setMode }) {
         const selectedTheme = event.target.value
         setTheme(selectedTheme)
         setMode(selectedTheme)
+        localStorage.setItem('theme', selectedTheme)
         if (auth.currentUser) {
             try {
                 await setDoc(doc(db, 'users', auth.currentUser.uid), {
@@ -107,7 +108,14 @@ function User({ setMode }) {
             <Typography variant="h4" component="h1" gutterBottom>
                 User Settings
             </Typography>
-            {message && <Typography color="primary" style={{ marginTop: '20px' }}>{message}</Typography>}
+
+            <div style={{ minHeight: '25px' }}>
+                {message && (
+                    <Typography color={message.includes('Error') ? 'error' : 'primary'}>
+                        {message}
+                    </Typography>
+                )}
+            </div>
 
             <Card style={{ marginBottom: '20px' }}>
                 <CardContent>
@@ -145,10 +153,21 @@ function User({ setMode }) {
                             />
                         </Grid>
                         <Grid item xs={4}>
-                            <Button variant="contained" color="primary" fullWidth onClick={handleSaveApiKey}>
+                            <Button
+                                variant="contained"
+                                color="primary"
+                                fullWidth
+                                onClick={handleSaveApiKey}
+                            >
                                 Save
                             </Button>
-                            <Button variant="contained" color="secondary" fullWidth onClick={handleDeleteApiKey} style={{ marginTop: '10px' }}>
+                            <Button
+                                variant="contained"
+                                color="secondary"
+                                fullWidth
+                                onClick={handleDeleteApiKey}
+                                style={{ marginTop: '10px' }}
+                            >
                                 Delete
                             </Button>
                         </Grid>
