@@ -165,9 +165,6 @@ function App() {
                         >
                             <MenuIcon />
                         </IconButton>
-                        <Typography variant="h6" noWrap component="div">
-                            FrugalGPT
-                        </Typography>
                         <Box sx={{ flexGrow: 1 }} />
                         <Button color="inherit" href="/" sx={{ marginRight: 2 }}>
                             Home
