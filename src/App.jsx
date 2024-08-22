@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { Route, Routes, useNavigate } from 'react-router-dom'
 import {
-    AppBar, Toolbar, Typography, Button, Container, Menu, MenuItem, IconButton, CssBaseline
+    AppBar, Toolbar, Typography, Button, Container, Menu, MenuItem, IconButton, CssBaseline, Box
 } from '@mui/material'
 import AccountCircle from '@mui/icons-material/AccountCircle'
 import { ThemeProvider, createTheme } from '@mui/material/styles'
@@ -12,6 +12,8 @@ import { db } from './services/firebase'
 import Login from './components/Login'
 import User from './components/User'
 import Signin from './components/Signin'
+import Sidenav from './components/Sidenav'
+import Chat from './components/Chat'
 
 function Home() {
     return (
@@ -19,21 +21,8 @@ function Home() {
             <Typography variant="h2" component="h1" gutterBottom>
                 Welcome to FrugalGPT
             </Typography>
-            <Typography variant="body1">
+            <Typography variant="body1" gutterBottom>
                 Start building your frugal solutions with AI-powered guidance.
-            </Typography>
-        </Container>
-    )
-}
-
-function About() {
-    return (
-        <Container>
-            <Typography variant="h2" component="h1" gutterBottom>
-                About FrugalGPT
-            </Typography>
-            <Typography variant="body1">
-                FrugalGPT is a platform that helps you optimize your resources with AI.
             </Typography>
         </Container>
     )
@@ -98,60 +87,65 @@ function App() {
     return (
         <ThemeProvider theme={theme}>
             <CssBaseline />
-            <AppBar position="static">
-                <Toolbar>
-                    <Typography variant="h6" style={{ flexGrow: 1 }}>
-                        FrugalGPT
-                    </Typography>
-                    <Button color="inherit" href="/">
-                        Home
-                    </Button>
-                    {user ? (
-                        <div>
-                            <IconButton
-                                size="large"
-                                edge="end"
-                                aria-label="account of current user"
-                                aria-controls="menu-appbar"
-                                aria-haspopup="true"
-                                onClick={handleUserClick}
-                                color="inherit"
-                            >
-                                <AccountCircle />
-                            </IconButton>
-                            <Menu
-                                id="menu-appbar"
-                                anchorEl={anchorEl}
-                                anchorOrigin={{
-                                    vertical: 'top',
-                                    horizontal: 'right'
-                                }}
-                                keepMounted
-                                transformOrigin={{
-                                    vertical: 'top',
-                                    horizontal: 'right'
-                                }}
-                                open={Boolean(anchorEl)}
-                                onClose={handleMenuClose}
-                            >
-                                <MenuItem onClick={handleSettings}>Settings</MenuItem>
-                                <MenuItem onClick={handleLogout}>Log out</MenuItem>
-                            </Menu>
-                        </div>
-                    ) : (
-                        <Button color="inherit" href="/login">
-                            Login
-                        </Button>
-                    )}
-                </Toolbar>
-            </AppBar>
-            <Routes>
-                <Route path="/" element={<Home />} />
-                <Route path="/about" element={<About />} />
-                <Route path="/login" element={<Login />} />
-                <Route path="/signin" element={<Signin />} />
-                <Route path="/user" element={<User setMode={setMode} />} />
-            </Routes>
+            <Box sx={{ display: 'flex' }}>
+                <Sidenav />
+                <Box sx={{ flexGrow: 1 }}>
+                    <AppBar position="static">
+                        <Toolbar>
+                            <Box sx={{ flexGrow: 1 }} />
+                            <Button color="inherit" href="/" sx={{ marginRight: 2 }}>
+                                Home
+                            </Button>
+                            {user ? (
+                                <div>
+                                    <IconButton
+                                        size="large"
+                                        edge="end"
+                                        aria-label="account of current user"
+                                        aria-controls="menu-appbar"
+                                        aria-haspopup="true"
+                                        onClick={handleUserClick}
+                                        color="inherit"
+                                    >
+                                        <AccountCircle />
+                                    </IconButton>
+                                    <Menu
+                                        id="menu-appbar"
+                                        anchorEl={anchorEl}
+                                        anchorOrigin={{
+                                            vertical: 'top',
+                                            horizontal: 'right'
+                                        }}
+                                        keepMounted
+                                        transformOrigin={{
+                                            vertical: 'top',
+                                            horizontal: 'right'
+                                        }}
+                                        open={Boolean(anchorEl)}
+                                        onClose={handleMenuClose}
+                                    >
+                                        <MenuItem onClick={handleSettings}>Settings</MenuItem>
+                                        <MenuItem onClick={handleLogout}>Log out</MenuItem>
+                                    </Menu>
+                                </div>
+                            ) : (
+                                <Button color="inherit" href="/login">
+                                    Login
+                                </Button>
+                            )}
+                        </Toolbar>
+                    </AppBar>
+                    <Box component="main" sx={{ padding: 3 }}>
+                        <Routes>
+                            <Route path="/" element={<Home />} />
+                            <Route path="/login" element={<Login />} />
+                            <Route path="/signin" element={<Signin />} />
+                            <Route path="/user" element={<User setMode={setMode} />} />
+                            <Route path="/chat/:id" element={<Chat />} />
+                        </Routes>
+                    </Box>
+                </Box>
+            </Box>
         </ThemeProvider>
     )
 }
