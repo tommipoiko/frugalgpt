@@ -3,18 +3,19 @@ import {
     TextField, Button, Container, Typography
 } from '@mui/material'
 import { signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider } from 'firebase/auth'
-import { Link } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { auth } from '../services/firebase'
 
 function Login() {
     const [email, setEmail] = useState('')
     const [password, setPassword] = useState('')
     const [error, setError] = useState('')
+    const navigate = useNavigate()
 
     const handleLogin = async () => {
         try {
             await signInWithEmailAndPassword(auth, email, password)
-            alert('Logged in successfully!')
+            navigate('/')
         } catch (err) {
             setError(err.message)
         }
@@ -24,7 +25,7 @@ function Login() {
         const provider = new GoogleAuthProvider()
         try {
             await signInWithPopup(auth, provider)
-            alert('Logged in with Google!')
+            navigate('/')
         } catch (err) {
             setError(err.message)
         }
@@ -65,7 +66,7 @@ function Login() {
             <Typography align="center" variant="body2" gutterBottom style={{ marginTop: '20px' }}>
                 New here?
                 {' '}
-                <Link to="/signin">Create an account</Link>
+                <a href="/signin">Create an account</a>
             </Typography>
         </Container>
     )

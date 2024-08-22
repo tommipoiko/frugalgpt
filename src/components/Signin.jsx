@@ -19,8 +19,7 @@ function Signin() {
         try {
             await createUserWithEmailAndPassword(auth, email, password)
             setMessage('Account created successfully!')
-            // Redirect to user settings or another appropriate page
-            setTimeout(() => navigate('/user'), 2000)
+            navigate('/')
         } catch (err) {
             setError(err.message)
         }
