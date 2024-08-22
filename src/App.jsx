@@ -21,8 +21,6 @@ import ChevronRightIcon from '@mui/icons-material/ChevronRight'
 import AccountCircle from '@mui/icons-material/AccountCircle'
 import useMediaQuery from '@mui/material/useMediaQuery'
 import { getAuth, onAuthStateChanged, signOut } from 'firebase/auth'
-import { doc, getDoc } from 'firebase/firestore'
-import { db } from './services/firebase'
 import Login from './components/Login'
 import User from './components/User'
 import Signin from './components/Signin'
@@ -101,18 +99,9 @@ function App() {
     const prefersDarkMode = useMediaQuery('(prefers-color-scheme: dark)')
 
     useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+        const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
             setUser(currentUser)
             localStorage.setItem('frugalGptUser', JSON.stringify(currentUser))
-            if (currentUser) {
-                const docRef = doc(db, 'users', currentUser.uid)
-                const docSnap = await getDoc(docRef)
-                if (docSnap.exists()) {
-                    const userTheme = docSnap.data().theme || 'system'
-                    setMode(userTheme)
-                    localStorage.setItem('frugalGptTheme', userTheme)
-                }
-            }
         })
 
         return () => unsubscribe()

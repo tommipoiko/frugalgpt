@@ -11,7 +11,7 @@ import { auth, db } from '../services/firebase'
 function User({ setMode }) {
     const [apiKey, setApiKey] = useState('')
     const [message, setMessage] = useState('')
-    const [theme, setTheme] = useState('system')
+    const [theme, setTheme] = useState(() => localStorage.getItem('frugalGptTheme') || 'system')
     const [loading, setLoading] = useState(true)
 
     useEffect(() => {
@@ -22,7 +22,6 @@ function User({ setMode }) {
                 if (docSnap.exists()) {
                     const userData = docSnap.data()
                     setApiKey(userData.openaiKey || '')
-                    setTheme(userData.theme || 'system')
                     setMessage('')
                 } else {
                     setMessage('No API key found.')
@@ -74,23 +73,11 @@ function User({ setMode }) {
         }
     }
 
-    const handleThemeChange = async (event) => {
+    const handleThemeChange = (event) => {
         const selectedTheme = event.target.value
         setTheme(selectedTheme)
         setMode(selectedTheme)
         localStorage.setItem('frugalGptTheme', selectedTheme)
-        if (auth.currentUser) {
-            try {
-                await setDoc(doc(db, 'users', auth.currentUser.uid), {
-                    theme: selectedTheme
-                }, { merge: true })
-                setMessage('Theme preference saved successfully!')
-            } catch (error) {
-                setMessage(`Error saving theme preference: ${error.message}`)
-            }
-        } else {
-            setMessage('User not authenticated')
-        }
     }
 
     if (loading) {
