@@ -1,6 +1,8 @@
-import React, { useEffect, useState } from 'react';
-import { Route, Routes, useNavigate } from 'react-router-dom';
-import { styled, useTheme } from '@mui/material/styles';
+import React, { useEffect, useState } from 'react'
+import { Route, Routes, useNavigate } from 'react-router-dom'
+import {
+    styled, useTheme, ThemeProvider, createTheme
+} from '@mui/material/styles'
 import {
     AppBar as MuiAppBar,
     Box,
@@ -11,23 +13,23 @@ import {
     Typography,
     Menu,
     MenuItem,
-    Button,
-} from '@mui/material';
-import MenuIcon from '@mui/icons-material/Menu';
-import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
-import ChevronRightIcon from '@mui/icons-material/ChevronRight';
-import AccountCircle from '@mui/icons-material/AccountCircle';
-import useMediaQuery from '@mui/material/useMediaQuery';
-import { getAuth, onAuthStateChanged, signOut } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
-import { db } from './services/firebase';
-import Login from './components/Login';
-import User from './components/User';
-import Signin from './components/Signin';
-import Sidenav from './components/Sidenav';
-import Chat from './components/Chat';
+    Button
+} from '@mui/material'
+import MenuIcon from '@mui/icons-material/Menu'
+import ChevronLeftIcon from '@mui/icons-material/ChevronLeft'
+import ChevronRightIcon from '@mui/icons-material/ChevronRight'
+import AccountCircle from '@mui/icons-material/AccountCircle'
+import useMediaQuery from '@mui/material/useMediaQuery'
+import { getAuth, onAuthStateChanged, signOut } from 'firebase/auth'
+import { doc, getDoc } from 'firebase/firestore'
+import { db } from './services/firebase'
+import Login from './components/Login'
+import User from './components/User'
+import Signin from './components/Signin'
+import Sidenav from './components/Sidenav'
+import Chat from './components/Chat'
 
-const drawerWidth = 240;
+const drawerWidth = 240
 
 const Main = styled('main', { shouldForwardProp: (prop) => prop !== 'open' })(
     ({ theme, open }) => ({
@@ -35,114 +37,124 @@ const Main = styled('main', { shouldForwardProp: (prop) => prop !== 'open' })(
         padding: theme.spacing(3),
         transition: theme.transitions.create('margin', {
             easing: theme.transitions.easing.sharp,
-            duration: theme.transitions.duration.leavingScreen,
+            duration: theme.transitions.duration.leavingScreen
         }),
         marginLeft: `-${drawerWidth}px`,
         ...(open && {
             transition: theme.transitions.create('margin', {
                 easing: theme.transitions.easing.easeOut,
-                duration: theme.transitions.duration.enteringScreen,
+                duration: theme.transitions.duration.enteringScreen
             }),
-            marginLeft: 0,
-        }),
+            marginLeft: 0
+        })
     })
-);
+)
 
 const AppBar = styled(MuiAppBar, {
-    shouldForwardProp: (prop) => prop !== 'open',
+    shouldForwardProp: (prop) => prop !== 'open'
 })(({ theme, open }) => ({
     transition: theme.transitions.create(['margin', 'width'], {
         easing: theme.transitions.easing.sharp,
-        duration: theme.transitions.duration.leavingScreen,
+        duration: theme.transitions.duration.leavingScreen
     }),
     ...(open && {
         width: `calc(100% - ${drawerWidth}px)`,
         marginLeft: `${drawerWidth}px`,
         transition: theme.transitions.create(['margin', 'width'], {
             easing: theme.transitions.easing.easeOut,
-            duration: theme.transitions.duration.enteringScreen,
-        }),
-    }),
-}));
+            duration: theme.transitions.duration.enteringScreen
+        })
+    })
+}))
 
 const DrawerHeader = styled('div')(({ theme }) => ({
     display: 'flex',
     alignItems: 'center',
     padding: theme.spacing(0, 1),
     ...theme.mixins.toolbar,
-    justifyContent: 'flex-end',
-}));
+    justifyContent: 'flex-end'
+}))
+
+function Home() {
+    return (
+        <Box sx={{ padding: 3 }}>
+            <Typography variant="h2" component="h1" gutterBottom>
+                Welcome to FrugalGPT
+            </Typography>
+            <Typography variant="body1" gutterBottom>
+                Start building your frugal solutions with AI-powered guidance.
+            </Typography>
+        </Box>
+    )
+}
 
 function App() {
-    const theme = useTheme();
-    const [user, setUser] = useState(() => JSON.parse(localStorage.getItem('user')) || null); // Initialize from localStorage
-    const [anchorEl, setAnchorEl] = useState(null);
-    const [open, setOpen] = useState(() => localStorage.getItem('sidenav') === 'true');
-    const [mode, setMode] = useState(() => localStorage.getItem('theme') || 'system');
-    const auth = getAuth();
-    const navigate = useNavigate();
-    const prefersDarkMode = useMediaQuery('(prefers-color-scheme: dark)');
+    const theme = useTheme()
+    const [user, setUser] = useState(null)
+    const [anchorEl, setAnchorEl] = useState(null)
+    const [open, setOpen] = useState(() => localStorage.getItem('sidenav') === 'true')
+    const [mode, setMode] = useState(() => localStorage.getItem('theme') || 'system')
+    const auth = getAuth()
+    const navigate = useNavigate()
+    const prefersDarkMode = useMediaQuery('(prefers-color-scheme: dark)')
 
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-            setUser(currentUser);
-            localStorage.setItem('user', JSON.stringify(currentUser)); // Save user state to localStorage
+            setUser(currentUser)
             if (currentUser) {
-                const docRef = doc(db, 'users', currentUser.uid);
-                const docSnap = await getDoc(docRef);
+                const docRef = doc(db, 'users', currentUser.uid)
+                const docSnap = await getDoc(docRef)
                 if (docSnap.exists()) {
-                    const userTheme = docSnap.data().theme || 'system';
-                    setMode(userTheme);
-                    localStorage.setItem('theme', userTheme);
+                    const userTheme = docSnap.data().theme || 'system'
+                    setMode(userTheme)
+                    localStorage.setItem('theme', userTheme)
                 }
             }
-        });
+        })
 
-        return () => unsubscribe();
-    }, [auth]);
+        return () => unsubscribe()
+    }, [auth])
 
     const getThemeMode = () => {
-        if (mode === 'dark') return 'dark';
-        if (mode === 'light') return 'light';
-        return prefersDarkMode ? 'dark' : 'light';
-    };
+        if (mode === 'dark') return 'dark'
+        if (mode === 'light') return 'light'
+        return prefersDarkMode ? 'dark' : 'light'
+    }
 
     const handleUserClick = (event) => {
-        setAnchorEl(event.currentTarget);
-    };
+        setAnchorEl(event.currentTarget)
+    }
 
     const handleMenuClose = () => {
-        setAnchorEl(null);
-    };
+        setAnchorEl(null)
+    }
 
     const handleSettings = () => {
-        setAnchorEl(null);
-        navigate('/user');
-    };
+        setAnchorEl(null)
+        navigate('/user')
+    }
 
     const handleLogout = async () => {
-        setAnchorEl(null);
-        await signOut(auth);
-        setUser(null); // Clear user state
-        localStorage.removeItem('user'); // Remove user from localStorage
-        navigate('/login');
-    };
+        setAnchorEl(null)
+        await signOut(auth)
+        navigate('/login')
+    }
 
     const toggleDrawerOpen = () => {
-        setOpen(true);
-        localStorage.setItem('sidenav', 'true');
-    };
+        setOpen(true)
+        localStorage.setItem('sidenav', 'true')
+    }
 
     const toggleDrawerClose = () => {
-        setOpen(false);
-        localStorage.setItem('sidenav', 'false');
-    };
+        setOpen(false)
+        localStorage.setItem('sidenav', 'false')
+    }
 
     const themeConfig = createTheme({
         palette: {
-            mode: getThemeMode(),
-        },
-    });
+            mode: getThemeMode()
+        }
+    })
 
     return (
         <ThemeProvider theme={themeConfig}>
@@ -159,9 +171,6 @@ function App() {
                         >
                             <MenuIcon />
                         </IconButton>
-                        <Typography variant="h6" noWrap component="div">
-                            FrugalGPT
-                        </Typography>
                         <Box sx={{ flexGrow: 1 }} />
                         <Button color="inherit" href="/" sx={{ marginRight: 2 }}>
                             Home
@@ -184,12 +193,12 @@ function App() {
                                     anchorEl={anchorEl}
                                     anchorOrigin={{
                                         vertical: 'top',
-                                        horizontal: 'right',
+                                        horizontal: 'right'
                                     }}
                                     keepMounted
                                     transformOrigin={{
                                         vertical: 'top',
-                                        horizontal: 'right',
+                                        horizontal: 'right'
                                     }}
                                     open={Boolean(anchorEl)}
                                     onClose={handleMenuClose}
@@ -211,8 +220,8 @@ function App() {
                         flexShrink: 0,
                         '& .MuiDrawer-paper': {
                             width: drawerWidth,
-                            boxSizing: 'border-box',
-                        },
+                            boxSizing: 'border-box'
+                        }
                     }}
                     variant="persistent"
                     anchor="left"
@@ -237,7 +246,7 @@ function App() {
                 </Main>
             </Box>
         </ThemeProvider>
-    );
+    )
 }
 
-export default App;
+export default App
