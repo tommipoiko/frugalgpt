@@ -1,16 +1,17 @@
 import React, { useEffect, useState } from 'react'
 import { Route, Routes, useNavigate } from 'react-router-dom'
 import {
-    AppBar, Toolbar, Typography, Button, Container, Menu, MenuItem, IconButton
+    AppBar, Toolbar, Typography, Button, Container, Menu, MenuItem, IconButton, CssBaseline
 } from '@mui/material'
 import AccountCircle from '@mui/icons-material/AccountCircle'
-import CssBaseline from '@mui/material/CssBaseline'
 import { ThemeProvider, createTheme } from '@mui/material/styles'
 import useMediaQuery from '@mui/material/useMediaQuery'
 import { getAuth, onAuthStateChanged, signOut } from 'firebase/auth'
+import { doc, getDoc } from 'firebase/firestore'
+import { db } from './services/firebase'
 import Login from './components/Login'
 import User from './components/User'
-import Signin from './components/Signin' // Import the Signin component
+import Signin from './components/Signin'
 
 function Home() {
     return (
@@ -41,23 +42,38 @@ function About() {
 function App() {
     const [user, setUser] = useState(null)
     const [anchorEl, setAnchorEl] = useState(null)
+    const [mode, setMode] = useState('system') // Start with system mode
     const auth = getAuth()
     const navigate = useNavigate()
     const prefersDarkMode = useMediaQuery('(prefers-color-scheme: dark)')
 
-    const theme = createTheme({
-        palette: {
-            mode: prefersDarkMode ? 'dark' : 'light'
-        }
-    })
-
     useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+        const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
             setUser(currentUser)
+            if (currentUser) {
+                const docRef = doc(db, 'users', currentUser.uid)
+                const docSnap = await getDoc(docRef)
+                if (docSnap.exists()) {
+                    const userTheme = docSnap.data().theme || 'system'
+                    setMode(userTheme)
+                }
+            }
         })
 
         return () => unsubscribe()
     }, [auth])
+
+    const getThemeMode = () => {
+        if (mode === 'dark') return 'dark'
+        if (mode === 'light') return 'light'
+        return prefersDarkMode ? 'dark' : 'light'
+    }
+
+    const theme = createTheme({
+        palette: {
+            mode: getThemeMode()
+        }
+    })
 
     const handleUserClick = (event) => {
         setAnchorEl(event.currentTarget)
@@ -133,7 +149,7 @@ function App() {
                 <Route path="/about" element={<About />} />
                 <Route path="/login" element={<Login />} />
                 <Route path="/signin" element={<Signin />} />
-                <Route path="/user" element={<User />} />
+                <Route path="/user" element={<User setMode={setMode} />} />
             </Routes>
         </ThemeProvider>
     )
