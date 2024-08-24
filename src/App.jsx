@@ -80,6 +80,7 @@ function App() {
     const [anchorEl, setAnchorEl] = useState(null)
     const [open, setOpen] = useState(() => localStorage.getItem('frugalGptSidenav') === 'true')
     const [mode, setMode] = useState(() => localStorage.getItem('frugalGptTheme') || 'system')
+    const [currentChat, setCurrentChat] = useState(null)
     const auth = getAuth()
     const navigate = useNavigate()
     const prefersDarkMode = useMediaQuery('(prefers-color-scheme: dark)')
@@ -136,6 +137,20 @@ function App() {
         }
     })
 
+    const handleNewChat = () => {
+        setCurrentChat(null)
+        navigate('/')
+    }
+
+    const handleNavigateChat = (id) => {
+        if (id === 'new') {
+            handleNewChat()
+            return
+        }
+        setCurrentChat(id)
+        navigate(`/chat/${id}`)
+    }
+
     return (
         <ThemeProvider theme={themeConfig}>
             <CssBaseline />
@@ -152,7 +167,11 @@ function App() {
                             <MenuIcon />
                         </IconButton>
                         <Box sx={{ flexGrow: 1 }} />
-                        <Button color="inherit" href="/" sx={{ marginRight: 2 }}>
+                        <Button
+                            color="inherit"
+                            onClick={handleNewChat}
+                            sx={{ marginRight: 2 }}
+                        >
                             Home
                         </Button>
                         {user ? (
@@ -212,16 +231,16 @@ function App() {
                             {theme.direction === 'ltr' ? <ChevronLeftIcon /> : <ChevronRightIcon />}
                         </IconButton>
                     </DrawerHeader>
-                    <Sidenav />
+                    <Sidenav onNavigateChat={handleNavigateChat} />
                 </Drawer>
                 <Main open={open}>
                     <DrawerHeader />
                     <Routes>
-                        <Route path="/" element={<Chat />} />
+                        <Route path="/" element={<Chat currentChat={currentChat} />} />
                         <Route path="/login" element={<Login />} />
                         <Route path="/signin" element={<Signin />} />
                         <Route path="/user" element={<User setMode={setMode} />} />
-                        <Route path="/chat/:id" element={<Chat />} />
+                        <Route path="/chat/:id" element={<Chat currentChat={currentChat} />} />
                     </Routes>
                 </Main>
             </Box>

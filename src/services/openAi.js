@@ -17,7 +17,7 @@ const sendMessage = async (message, apiKey, assistantId, chatId = null) => {
 
         await openai.beta.threads.messages.create(threadId, {
             role: 'user',
-            content: message.text
+            content: message.content
         })
 
         const responseStream = openai.beta.threads.runs.stream(threadId, {

@@ -1,58 +1,41 @@
-import React, { useState, useEffect } from 'react'
+import React, { useEffect, useState } from 'react'
 import {
     List, ListItem, ListItemText, Typography
 } from '@mui/material'
-import { useNavigate } from 'react-router-dom'
-import { collection, getDocs } from 'firebase/firestore'
-import { db } from '../services/firebase'
+import {
+    getFirestore, collection, query, orderBy, onSnapshot
+} from 'firebase/firestore'
 
-function Sidenav() {
-    const navigate = useNavigate()
+function Sidenav({ onNavigateChat }) {
     const [chats, setChats] = useState([])
 
     useEffect(() => {
-        const fetchChats = async () => {
-            const chatCollection = collection(db, 'chats')
-            const chatSnapshot = await getDocs(chatCollection)
-            const chatList = chatSnapshot.docs.map((doc) => ({
+        const db = getFirestore()
+        const q = query(collection(db, 'chats'), orderBy('lastUpdated', 'desc'))
+
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            const chatList = snapshot.docs.map((doc) => ({
                 id: doc.id,
                 ...doc.data()
             }))
             setChats(chatList)
-        }
+        })
 
-        fetchChats()
+        return () => unsubscribe()
     }, [])
-
-    const handleNewChat = () => {
-        navigate('/chat/new')
-    }
-
-    const handleChatClick = (id) => {
-        navigate(`/chat/${id}`)
-    }
 
     return (
         <List>
-            <ListItem button onClick={handleNewChat}>
+            <ListItem button onClick={() => onNavigateChat('new')}>
                 <ListItemText primary="New Chat" />
             </ListItem>
             {chats.map((chat) => (
-                <ListItem
-                    button
-                    key={chat.id}
-                    onClick={() => handleChatClick(chat.id)}
-                >
+                <ListItem button key={chat.id} onClick={() => onNavigateChat(chat.id)}>
                     <ListItemText
                         primary={chat.name}
                         primaryTypographyProps={{
                             noWrap: true,
-                            style: {
-                                maxWidth: '200px',
-                                overflow: 'hidden',
-                                textOverflow: 'ellipsis',
-                                whiteSpace: 'nowrap'
-                            }
+                            title: chat.name
                         }}
                     />
                 </ListItem>

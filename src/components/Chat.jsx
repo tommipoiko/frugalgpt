@@ -1,43 +1,47 @@
-import React, { useState, useEffect } from 'react'
-import { useParams } from 'react-router-dom'
+import React, { useEffect, useState } from 'react'
 import {
     Box, Button, IconButton, Paper, Typography, List, ListItem
 } from '@mui/material'
 import AttachFileIcon from '@mui/icons-material/AttachFile'
 import SendIcon from '@mui/icons-material/Send'
 import TextareaAutosize from '@mui/material/TextareaAutosize'
+import { useParams } from 'react-router-dom'
 import {
-    doc, getDoc, updateDoc, arrayUnion
+    doc, getFirestore, onSnapshot
 } from 'firebase/firestore'
-import { db } from '../services/firebase'
 import chatApi from '../services/chatApi'
 
-function Chat() {
-    const { id } = useParams()
+function Chat({ currentChat }) {
     const [messages, setMessages] = useState([])
     const [currentMessage, setCurrentMessage] = useState('')
     const [attachments, setAttachments] = useState([])
+    const { id } = useParams()
+    const db = getFirestore()
 
+    // eslint-disable-next-line consistent-return
     useEffect(() => {
-        if (id !== 'new' && id) {
-            const loadChatHistory = async () => {
-                const docRef = doc(db, 'chats', id)
-                const docSnap = await getDoc(docRef)
-                if (docSnap.exists()) {
-                    setMessages(docSnap.data().messages || [])
+        if (id) {
+            const chatDocRef = doc(db, 'chats', id)
+            const unsubscribe = onSnapshot(chatDocRef, (snapshot) => {
+                if (snapshot.exists()) {
+                    const chatData = snapshot.data()
+                    setMessages(chatData.messages || [])
+                    console.log(chatData.messages)
                 }
-            }
-            loadChatHistory()
+            })
+
+            return () => unsubscribe()
         }
-    }, [id])
+        setMessages([])
+    }, [id, db])
 
     const handleSendMessage = async () => {
         if (currentMessage.trim() === '') return
 
         const newMessage = {
             id: Date.now(),
-            text: currentMessage,
-            sender: 'user',
+            content: currentMessage,
+            role: 'user',
             attachments
         }
 
@@ -45,27 +49,20 @@ function Chat() {
         setCurrentMessage('')
         setAttachments([])
 
-        const {
-            responseStream,
-            threadId
-        } = await chatApi.sendMessage(newMessage, id !== 'new' ? id : null)
-
-        if (id === 'new') {
-            window.history.replaceState(null, null, `/chat/${threadId}`)
-        }
+        const responseStream = await chatApi.sendMessage(newMessage, id || currentChat)
 
         if (responseStream) {
             responseStream.on('textCreated', () => {
                 setMessages((prevMessages) => [
                     ...prevMessages,
-                    { id: Date.now(), text: '', sender: 'system' }
+                    { id: Date.now(), content: '', role: 'system' }
                 ])
             })
 
             responseStream.on('textDelta', (textDelta) => {
                 setMessages((prevMessages) => {
                     const lastMessage = prevMessages[prevMessages.length - 1]
-                    lastMessage.text += textDelta.value
+                    lastMessage.content += textDelta.value
                     return [...prevMessages]
                 })
             })
@@ -73,14 +70,14 @@ function Chat() {
             responseStream.on('toolCallCreated', (toolCall) => {
                 setMessages((prevMessages) => [
                     ...prevMessages,
-                    { id: Date.now(), text: `Tool: ${toolCall.type}`, sender: 'system' }
+                    { id: Date.now(), content: `Tool: ${toolCall.type}`, role: 'system' }
                 ])
             })
 
-            responseStream.on('done', async () => {
-                await updateDoc(doc(db, 'chats', threadId), {
-                    messages: arrayUnion({ role: 'user', content: currentMessage })
-                })
+            responseStream.on('end', () => {
+                // chatApi.saveCompletedMessage(id || currentChat, messages)
+                console.log(id, currentChat, messages)
+                console.log('Chat ended')
             })
         }
     }
@@ -103,7 +100,7 @@ function Chat() {
         <ListItem
             key={message.id}
             sx={{
-                justifyContent: message.sender === 'user' ? 'flex-end' : 'flex-start',
+                justifyContent: message.role === 'user' ? 'flex-end' : 'flex-start',
                 overflowWrap: 'break-word',
                 wordBreak: 'break-word'
             }}
@@ -112,12 +109,12 @@ function Chat() {
                 elevation={3}
                 sx={{
                     padding: 2,
-                    backgroundColor: message.sender === 'user' ? '#e0f7fa' : '#f1f1f1',
+                    backgroundColor: message.role === 'user' ? '#e0f7fa' : '#f1f1f1',
                     maxWidth: '75%',
                     whiteSpace: 'pre-wrap'
                 }}
             >
-                <Typography variant="body1">{message.text}</Typography>
+                <Typography variant="body1">{message.content}</Typography>
                 {message.attachments && message.attachments.length > 0 && (
                     <Box sx={{ marginTop: 1 }}>
                         {message.attachments.map((attachment) => (

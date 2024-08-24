@@ -1,4 +1,6 @@
-import { doc, getDoc, setDoc } from 'firebase/firestore'
+import {
+    doc, getDoc, setDoc, updateDoc, serverTimestamp, arrayUnion
+} from 'firebase/firestore'
 import openAi from './openAi'
 import { auth, db } from './firebase'
 
@@ -23,49 +25,36 @@ const sendMessage = async (message, chatId = null) => {
             threadId
         } = await openAi.sendMessage(message, apiKey, assistantId, chatId)
 
-        const chatDocId = chatId || threadId
-
-        const chatDocRef = doc(db, 'chats', chatDocId)
-        const chatSnap = await getDoc(chatDocRef)
-
-        if (chatSnap.exists()) {
-            await setDoc(chatDocRef, {
-                messages: [...chatSnap.data().messages, { role: 'user', content: message.text }]
-            }, { merge: true })
-        } else {
+        if (!chatId) {
             const newChat = {
-                name: `Chat-${chatDocId}`,
+                name: `Chat-${threadId}`,
                 threadId,
-                messages: [{ role: 'user', content: message.text }]
+                messages: [{ id: Date.now(), role: 'user', content: message.content }],
+                lastUpdated: serverTimestamp()
             }
-            await setDoc(chatDocRef, newChat)
+            await setDoc(doc(db, 'chats', threadId), newChat)
+        } else {
+            await updateDoc(doc(db, 'chats', chatId), {
+                messages: arrayUnion({ id: Date.now(), role: 'user', content: message.content }),
+                lastUpdated: serverTimestamp()
+            })
         }
 
-        return { responseStream, threadId }
+        return responseStream
     }
 
     return null
 }
 
-const saveCompletedMessage = async (chatId, completeMessage) => {
-    const chatDocRef = doc(db, 'chats', chatId)
-    const chatSnap = await getDoc(chatDocRef)
-
-    if (chatSnap.exists()) {
-        await setDoc(chatDocRef, {
-            messages: [...chatSnap.data().messages, { role: 'system', content: completeMessage }]
-        }, { merge: true })
-    }
-}
-
-const getChatMessages = async (chatId) => {
-    const chatDocRef = doc(db, 'chats', chatId)
-    const chatSnap = await getDoc(chatDocRef)
-    return chatSnap.exists() ? chatSnap.data().messages : []
+const saveCompletedMessage = async (chatId, messages) => {
+    console.log(chatId, messages)
+    await updateDoc(doc(db, 'chats', chatId), {
+        messages,
+        lastUpdated: serverTimestamp()
+    })
 }
 
 export default {
     sendMessage,
-    saveCompletedMessage,
-    getChatMessages
+    saveCompletedMessage
 }
