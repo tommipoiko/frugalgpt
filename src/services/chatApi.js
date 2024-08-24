@@ -29,6 +29,7 @@ const sendMessage = async (message, chatId = null) => {
             const newChat = {
                 name: `Chat-${threadId}`,
                 threadId,
+                userId: user.uid,
                 messages: [{ id: Date.now(), role: 'user', content: message.content }],
                 lastUpdated: serverTimestamp()
             }
@@ -36,7 +37,8 @@ const sendMessage = async (message, chatId = null) => {
         } else {
             await updateDoc(doc(db, 'chats', chatId), {
                 messages: arrayUnion({ id: Date.now(), role: 'user', content: message.content }),
-                lastUpdated: serverTimestamp()
+                lastUpdated: serverTimestamp(),
+                userId: user.uid
             })
         }
 
@@ -47,9 +49,13 @@ const sendMessage = async (message, chatId = null) => {
 }
 
 const saveCompletedMessage = async (chatId, messages) => {
+    const user = auth.currentUser
+    if (!user) return
+
     await updateDoc(doc(db, 'chats', chatId), {
         messages,
-        lastUpdated: serverTimestamp()
+        lastUpdated: serverTimestamp(),
+        userId: user.uid
     })
 }
 

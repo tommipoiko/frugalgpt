@@ -3,15 +3,20 @@ import {
     List, ListItem, ListItemText, Typography
 } from '@mui/material'
 import {
-    getFirestore, collection, query, orderBy, onSnapshot
+    getFirestore, collection, query, orderBy, onSnapshot,
+    where
 } from 'firebase/firestore'
 
-function Sidenav({ onNavigateChat }) {
+function Sidenav({ user, onNavigateChat }) {
     const [chats, setChats] = useState([])
 
     useEffect(() => {
         const db = getFirestore()
-        const q = query(collection(db, 'chats'), orderBy('lastUpdated', 'desc'))
+        const q = query(
+            collection(db, 'chats'),
+            where('userId', '==', user.uid),
+            orderBy('lastUpdated', 'desc')
+        )
 
         const unsubscribe = onSnapshot(q, (snapshot) => {
             const chatList = snapshot.docs.map((doc) => ({

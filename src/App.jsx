@@ -241,7 +241,7 @@ function App() {
                             {theme.direction === 'ltr' ? <ChevronLeftIcon /> : <ChevronRightIcon />}
                         </IconButton>
                     </DrawerHeader>
-                    <Sidenav onNavigateChat={handleNavigateChat} />
+                    <Sidenav user={user} onNavigateChat={handleNavigateChat} />
                 </Drawer>
                 <Main open={open}>
                     <DrawerHeader />
