@@ -45,7 +45,8 @@ function Chat({ currentChat }) {
             attachments
         }
 
-        setMessages([...messages, newMessage])
+        const updatedMessages = [...messages, newMessage]
+        setMessages(updatedMessages)
         setCurrentMessage('')
         setAttachments([])
 
@@ -59,32 +60,37 @@ function Chat({ currentChat }) {
                 navigate(`/chats/${threadId}`, { replace: true })
             }
 
+            let accumulatedMessages = [...updatedMessages] // Local copy of accumulated messages
+
             responseStream.on('textCreated', () => {
-                setMessages((prevMessages) => [
-                    ...prevMessages,
-                    { id: Date.now(), content: '', role: 'system' }
-                ])
+                const newSystemMessage = { id: Date.now(), content: '', role: 'system' }
+                accumulatedMessages = [...accumulatedMessages, newSystemMessage]
+                setMessages(accumulatedMessages)
             })
 
             responseStream.on('textDelta', (textDelta) => {
-                setMessages((prevMessages) => {
-                    const lastMessage = prevMessages[prevMessages.length - 1]
-                    lastMessage.content += textDelta.value
-                    return [...prevMessages]
+                accumulatedMessages = accumulatedMessages.map((msg, index) => {
+                    if (index === accumulatedMessages.length - 1) {
+                        return { ...msg, content: msg.content + textDelta.value }
+                    }
+                    return msg
                 })
+                setMessages(accumulatedMessages)
             })
 
             responseStream.on('toolCallCreated', (toolCall) => {
-                setMessages((prevMessages) => [
-                    ...prevMessages,
-                    { id: Date.now(), content: `Tool: ${toolCall.type}`, role: 'system' }
-                ])
+                const toolMessage = {
+                    id: Date.now(),
+                    content: `Tool: ${toolCall.type}`,
+                    role: 'system'
+                }
+                accumulatedMessages = [...accumulatedMessages, toolMessage]
+                setMessages(accumulatedMessages)
             })
 
-            responseStream.on('end', () => {
-                // chatApi.saveCompletedMessage(id || currentChat, messages)
-                console.log(id, currentChat, messages)
-                console.log('Chat ended')
+            responseStream.on('end', async () => {
+                // Save the final message state to the database
+                await chatApi.saveCompletedMessage(threadId || id, accumulatedMessages)
             })
         }
     }

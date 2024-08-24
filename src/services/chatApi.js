@@ -47,7 +47,6 @@ const sendMessage = async (message, chatId = null) => {
 }
 
 const saveCompletedMessage = async (chatId, messages) => {
-    console.log(chatId, messages)
     await updateDoc(doc(db, 'chats', chatId), {
         messages,
         lastUpdated: serverTimestamp()

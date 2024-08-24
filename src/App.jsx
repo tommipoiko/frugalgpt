@@ -158,7 +158,7 @@ function App() {
             return
         }
         setCurrentChat(id)
-        window.history.pushState(null, '', `/chats/${id}`)
+        navigate(`/chats/${id}`)
     }
 
     return (
