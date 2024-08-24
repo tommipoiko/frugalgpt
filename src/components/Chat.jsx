@@ -1,3 +1,4 @@
+/* eslint-disable max-len */
 import React, { useEffect, useRef, useState } from 'react'
 import {
     Box, Button, IconButton, Paper, Typography, List, ListItem
@@ -7,9 +8,7 @@ import SendIcon from '@mui/icons-material/Send'
 import TextareaAutosize from '@mui/material/TextareaAutosize'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useTheme } from '@mui/material/styles'
-import {
-    doc, onSnapshot
-} from 'firebase/firestore'
+import { doc, onSnapshot } from 'firebase/firestore'
 import chatApi from '../services/chatApi'
 import { db } from '../services/firebase'
 
@@ -140,9 +139,9 @@ function Chat({ currentChat }) {
                 elevation={3}
                 sx={{
                     padding: 2,
-                    backgroundColor: message.role === 'user' ? theme.palette.primary.light : theme.palette.background.paper, // eslint-disable-line max-len
-                    color: message.role === 'user' ? theme.palette.primary.contrastText : theme.palette.text.primary, // eslint-disable-line max-len
-                    maxWidth: '75%',
+                    backgroundColor: message.role === 'user' ? theme.palette.primary.light : theme.palette.background.paper,
+                    color: message.role === 'user' ? theme.palette.primary.contrastText : theme.palette.text.primary,
+                    maxWidth: '90%',
                     whiteSpace: 'pre-wrap'
                 }}
             >
@@ -166,85 +165,106 @@ function Chat({ currentChat }) {
                 display: 'flex',
                 flexDirection: 'column',
                 height: 'calc(100vh - 128px)',
-                justifyContent: 'space-between'
+                justifyContent: 'space-between',
+                width: '100%',
+                overflowX: 'hidden'
             }}
         >
             <Box
                 sx={{
-                    flexGrow: 1,
+                    display: 'flex',
+                    justifyContent: 'center',
                     overflowY: 'auto',
-                    padding: 2
+                    flexGrow: 1,
+                    width: '100%'
                 }}
                 ref={listRef}
                 onScroll={handleScroll}
             >
-                <List>
-                    {messages.map((message) => renderMessage(message))}
-                </List>
+                <Box
+                    sx={{
+                        maxWidth: '900px',
+                        width: '100%',
+                        padding: 2,
+                        boxSizing: 'border-box'
+                    }}
+                >
+                    <List>
+                        {messages.map((message) => renderMessage(message))}
+                    </List>
+                </Box>
             </Box>
 
             <Box
                 component="form"
                 sx={{
                     display: 'flex',
-                    alignItems: 'flex-end',
+                    justifyContent: 'center',
                     padding: 1,
                     position: 'sticky',
-                    bottom: 0
+                    bottom: 0,
+                    width: '100%',
+                    boxSizing: 'border-box',
+                    backgroundColor: theme.palette.background.Paper
                 }}
                 onSubmit={(e) => {
                     e.preventDefault()
                     handleSendMessage()
                 }}
             >
-                <IconButton
-                    color="primary"
-                    component="label"
-                    sx={{ color: theme.palette.text.primary }}
-                >
-                    <AttachFileIcon />
-                    <input
-                        type="file"
-                        hidden
-                        onChange={handleAttachFile}
-                    />
-                </IconButton>
-                <TextareaAutosize
-                    minRows={1}
-                    maxRows={14}
-                    placeholder="Type your message..."
-                    value={currentMessage}
-                    onChange={(e) => setCurrentMessage(e.target.value)}
-                    onKeyDown={handleKeyDown}
-                    style={{
-                        width: '100%',
-                        marginLeft: '8px',
-                        padding: '8px',
-                        borderRadius: '4px',
-                        border: `1px solid ${theme.palette.divider}`,
-                        backgroundColor: theme.palette.background.paper,
-                        color: theme.palette.text.primary,
-                        resize: 'none',
-                        overflowY: 'auto',
-                        fontSize: '16px'
-                    }}
-                />
-                <Button
-                    variant="contained"
-                    type="submit"
+                <Box
                     sx={{
-                        marginLeft: 1,
-                        alignSelf: 'flex-end',
-                        backgroundColor: theme.palette.mode === 'dark' ? theme.palette.grey[700] : theme.palette.primary.main, // eslint-disable-line max-len
-                        color: theme.palette.mode === 'dark' ? theme.palette.text.primary : theme.palette.primary.contrastText, // eslint-disable-line max-len
-                        '&:hover': {
-                            backgroundColor: theme.palette.mode === 'dark' ? theme.palette.grey[500] : theme.palette.primary.dark // eslint-disable-line max-len
-                        }
+                        maxWidth: '700px',
+                        width: '100%',
+                        display: 'flex',
+                        alignItems: 'flex-end'
                     }}
-                    endIcon={<SendIcon />}
                 >
-                    Send
-                </Button>
+                    <IconButton color="primary" component="label" sx={{ color: theme.palette.text.primary }}>
+                        <AttachFileIcon />
+                        <input
+                            type="file"
+                            hidden
+                            onChange={handleAttachFile}
+                        />
+                    </IconButton>
+                    <TextareaAutosize
+                        minRows={1}
+                        maxRows={14}
+                        placeholder="Type your message..."
+                        value={currentMessage}
+                        onChange={(e) => setCurrentMessage(e.target.value)}
+                        onKeyDown={handleKeyDown}
+                        style={{
+                            width: '100%',
+                            marginLeft: '8px',
+                            padding: '8px',
+                            borderRadius: '4px',
+                            border: `1px solid ${theme.palette.divider}`,
+                            backgroundColor: theme.palette.background.paper,
+                            color: theme.palette.text.primary,
+                            resize: 'none',
+                            overflowY: 'auto',
+                            fontSize: '16px'
+                        }}
+                    />
+                    <Button
+                        variant="contained"
+                        type="submit"
+                        sx={{
+                            marginLeft: 1,
+                            alignSelf: 'flex-end',
+                            backgroundColor: theme.palette.mode === 'dark' ? theme.palette.grey[800] : theme.palette.primary.main,
+                            color: theme.palette.mode === 'dark' ? theme.palette.text.primary : theme.palette.primary.contrastText,
+                            '&:hover': {
+                                backgroundColor: theme.palette.mode === 'dark' ? theme.palette.grey[600] : theme.palette.primary.dark
+                            }
+                        }}
+                        endIcon={<SendIcon />}
+                    >
+                        Send
+                    </Button>
+                </Box>
             </Box>
         </Box>
     )
