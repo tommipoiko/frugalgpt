@@ -5,13 +5,14 @@ import {
 import AttachFileIcon from '@mui/icons-material/AttachFile'
 import SendIcon from '@mui/icons-material/Send'
 import TextareaAutosize from '@mui/material/TextareaAutosize'
+import chatApi from '../services/chatApi'
 
 function Chat() {
     const [messages, setMessages] = useState([])
     const [currentMessage, setCurrentMessage] = useState('')
     const [attachments, setAttachments] = useState([])
 
-    const handleSendMessage = () => {
+    const handleSendMessage = async () => {
         if (currentMessage.trim() === '') return
 
         const newMessage = {
@@ -24,6 +25,15 @@ function Chat() {
         setMessages([...messages, newMessage])
         setCurrentMessage('')
         setAttachments([])
+
+        const responseStream = chatApi.sendMessage(newMessage)
+
+        responseStream.on('data', (chunk) => {
+            setMessages((prevMessages) => [
+                ...prevMessages,
+                { id: Date.now(), text: chunk, sender: 'system' }
+            ])
+        })
     }
 
     const handleAttachFile = (event) => {

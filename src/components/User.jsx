@@ -4,12 +4,13 @@ import {
     Select, MenuItem
 } from '@mui/material'
 import {
-    doc, getDoc, setDoc, deleteDoc
+    doc, getDoc, setDoc
 } from 'firebase/firestore'
 import { auth, db } from '../services/firebase'
 
 function User({ setMode }) {
     const [apiKey, setApiKey] = useState('')
+    const [assistantId, setAssistantId] = useState('')
     const [message, setMessage] = useState('')
     const [theme, setTheme] = useState(() => localStorage.getItem('frugalGptTheme') || 'system')
     const [loading, setLoading] = useState(true)
@@ -21,7 +22,10 @@ function User({ setMode }) {
                 const docSnap = await getDoc(docRef)
                 if (docSnap.exists()) {
                     const userData = docSnap.data()
-                    setApiKey(userData.openaiKey || '')
+                    if (userData.openAi) {
+                        setApiKey(userData.openAi.openaiKey || '')
+                        setAssistantId(userData.openAi.assistantId || '')
+                    }
                     setMessage('')
                 } else {
                     setMessage('No API key found.')
@@ -48,9 +52,12 @@ function User({ setMode }) {
         if (auth.currentUser) {
             try {
                 await setDoc(doc(db, 'users', auth.currentUser.uid), {
-                    openaiKey: apiKey
+                    openAi: {
+                        openaiKey: apiKey,
+                        assistantId
+                    }
                 }, { merge: true })
-                setMessage('API Key saved successfully!')
+                setMessage('API Key and Assistant ID saved successfully!')
             } catch (error) {
                 setMessage(`Error saving API Key: ${error.message}`)
             }
@@ -62,9 +69,12 @@ function User({ setMode }) {
     const handleDeleteApiKey = async () => {
         if (auth.currentUser) {
             try {
-                await deleteDoc(doc(db, 'users', auth.currentUser.uid))
+                await setDoc(doc(db, 'users', auth.currentUser.uid), {
+                    openAi: {}
+                }, { merge: true })
                 setApiKey('')
-                setMessage('API Key deleted successfully!')
+                setAssistantId('')
+                setMessage('API Key and Assistant ID deleted successfully!')
             } catch (error) {
                 setMessage(`Error deleting API Key: ${error.message}`)
             }
@@ -127,7 +137,7 @@ function User({ setMode }) {
             <Card>
                 <CardContent>
                     <Typography variant="h6" component="h2" gutterBottom>
-                        OpenAI API Key
+                        OpenAI API settings
                     </Typography>
                     <Grid container spacing={2} alignItems="center">
                         <Grid item xs={8}>
@@ -137,26 +147,44 @@ function User({ setMode }) {
                                 fullWidth
                                 value={apiKey}
                                 onChange={(e) => setApiKey(e.target.value)}
+                                style={{ marginBottom: '10px' }}
+                            />
+                            <TextField
+                                label="Assistant ID"
+                                variant="outlined"
+                                fullWidth
+                                value={assistantId}
+                                onChange={(e) => setAssistantId(e.target.value)}
                             />
                         </Grid>
-                        <Grid item xs={4}>
-                            <Button
-                                variant="contained"
-                                color="primary"
-                                fullWidth
-                                onClick={handleSaveApiKey}
-                            >
-                                Save
-                            </Button>
-                            <Button
-                                variant="contained"
-                                color="secondary"
-                                fullWidth
-                                onClick={handleDeleteApiKey}
-                                style={{ marginTop: '10px' }}
-                            >
-                                Delete
-                            </Button>
+                        <Grid
+                            item
+                            xs={4}
+                            container
+                            direction="column"
+                            justifyContent="center"
+                            spacing={2}
+                        >
+                            <Grid item>
+                                <Button
+                                    variant="contained"
+                                    color="primary"
+                                    fullWidth
+                                    onClick={handleSaveApiKey}
+                                >
+                                    Save
+                                </Button>
+                            </Grid>
+                            <Grid item>
+                                <Button
+                                    variant="contained"
+                                    color="secondary"
+                                    fullWidth
+                                    onClick={handleDeleteApiKey}
+                                >
+                                    Delete
+                                </Button>
+                            </Grid>
                         </Grid>
                     </Grid>
                 </CardContent>
