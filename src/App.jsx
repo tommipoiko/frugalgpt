@@ -87,6 +87,7 @@ function App() {
     const navigate = useNavigate()
     const location = useLocation()
     const prefersDarkMode = useMediaQuery('(prefers-color-scheme: dark)')
+    const isMobile = useMediaQuery(theme.breakpoints.down('sm'))
 
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
@@ -141,15 +142,12 @@ function App() {
         localStorage.setItem('frugalGptSidenav', 'false')
     }
 
-    const themeConfig = createTheme({
-        palette: {
-            mode: getThemeMode()
-        }
-    })
-
     const handleNewChat = () => {
         setCurrentChat(null)
         navigate('/')
+        if (isMobile) {
+            toggleDrawerClose()
+        }
     }
 
     const handleNavigateChat = (id) => {
@@ -159,7 +157,16 @@ function App() {
         }
         setCurrentChat(id)
         navigate(`/chats/${id}`)
+        if (isMobile) {
+            toggleDrawerClose()
+        }
     }
+
+    const themeConfig = createTheme({
+        palette: {
+            mode: getThemeMode()
+        }
+    })
 
     return (
         <ThemeProvider theme={themeConfig}>
@@ -229,12 +236,14 @@ function App() {
                         flexShrink: 0,
                         '& .MuiDrawer-paper': {
                             width: drawerWidth,
-                            boxSizing: 'border-box'
+                            boxSizing: 'border-box',
+                            ...(isMobile && { width: '100vw', height: '100vh' })
                         }
                     }}
-                    variant="persistent"
+                    variant={isMobile ? 'temporary' : 'persistent'}
                     anchor="left"
                     open={open}
+                    onClose={toggleDrawerClose}
                 >
                     <DrawerHeader>
                         <IconButton onClick={toggleDrawerClose}>

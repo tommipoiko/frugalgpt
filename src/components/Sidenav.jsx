@@ -12,7 +12,6 @@ function Sidenav({ user, onNavigateChat }) {
     const [chats, setChats] = useState([])
 
     useEffect(() => {
-        // const db = getFirestore()
         const q = query(
             collection(db, 'chats'),
             where('userId', '==', user.uid),
@@ -28,7 +27,7 @@ function Sidenav({ user, onNavigateChat }) {
         })
 
         return () => unsubscribe()
-    }, [])
+    }, [user])
 
     return (
         <List>
