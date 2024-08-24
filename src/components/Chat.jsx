@@ -29,7 +29,14 @@ function Chat() {
     const handleAttachFile = (event) => {
         const file = event.target.files[0]
         if (file) {
-            setAttachments([...attachments, file])
+            setAttachments([...attachments, { id: Date.now(), name: file.name }])
+        }
+    }
+
+    const handleKeyDown = (event) => {
+        if (event.key === 'Enter' && !event.shiftKey) {
+            event.preventDefault()
+            handleSendMessage()
         }
     }
 
@@ -47,7 +54,8 @@ function Chat() {
                 sx={{
                     padding: 2,
                     backgroundColor: message.sender === 'user' ? '#e0f7fa' : '#f1f1f1',
-                    maxWidth: '75%'
+                    maxWidth: '75%',
+                    whiteSpace: 'pre-wrap'
                 }}
             >
                 <Typography variant="body1">{message.text}</Typography>
@@ -69,8 +77,9 @@ function Chat() {
             sx={{
                 display: 'flex',
                 flexDirection: 'column',
-                height: '100vh',
-                justifyContent: 'space-between'
+                height: 'calc(100vh - 64px)',
+                justifyContent: 'space-between',
+                marginTop: '64px'
             }}
         >
             <Box
@@ -114,6 +123,7 @@ function Chat() {
                     placeholder="Type your message..."
                     value={currentMessage}
                     onChange={(e) => setCurrentMessage(e.target.value)}
+                    onKeyDown={handleKeyDown}
                     style={{
                         width: '100%',
                         marginLeft: '8px',
