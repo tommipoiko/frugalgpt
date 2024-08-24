@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import {
     Box, Button, IconButton, Paper, Typography, List, ListItem
 } from '@mui/material'
@@ -18,6 +18,8 @@ function Chat({ currentChat }) {
     const { id } = useParams()
     const navigate = useNavigate()
     const db = getFirestore()
+    const listRef = useRef(null)
+    const [autoScrollEnabled, setAutoScrollEnabled] = useState(true)
 
     // eslint-disable-next-line consistent-return
     useEffect(() => {
@@ -34,6 +36,21 @@ function Chat({ currentChat }) {
         }
         setMessages([])
     }, [id, db])
+
+    useEffect(() => {
+        if (autoScrollEnabled && listRef.current) {
+            listRef.current.scrollTop = listRef.current.scrollHeight
+        }
+    }, [messages, autoScrollEnabled])
+
+    const handleScroll = () => {
+        if (!listRef.current) return
+
+        const isAtBottom = listRef.current.scrollHeight - listRef.current.scrollTop
+            === listRef.current.clientHeight
+
+        setAutoScrollEnabled(isAtBottom)
+    }
 
     const handleSendMessage = async () => {
         if (currentMessage.trim() === '') return
@@ -155,6 +172,8 @@ function Chat({ currentChat }) {
                     overflowY: 'auto',
                     padding: 2
                 }}
+                ref={listRef}
+                onScroll={handleScroll}
             >
                 <List>
                     {messages.map((message) => renderMessage(message))}
