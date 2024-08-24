@@ -10,7 +10,6 @@ import {
     Drawer,
     IconButton,
     Toolbar,
-    Typography,
     Menu,
     MenuItem,
     Button
@@ -72,19 +71,6 @@ const DrawerHeader = styled('div')(({ theme }) => ({
     ...theme.mixins.toolbar,
     justifyContent: 'flex-end'
 }))
-
-function Home() {
-    return (
-        <Box sx={{ padding: 3 }}>
-            <Typography variant="h2" component="h1" gutterBottom>
-                Welcome to FrugalGPT
-            </Typography>
-            <Typography variant="body1" gutterBottom>
-                Start building your frugal solutions with AI-powered guidance.
-            </Typography>
-        </Box>
-    )
-}
 
 function App() {
     const theme = useTheme()
@@ -231,7 +217,7 @@ function App() {
                 <Main open={open}>
                     <DrawerHeader />
                     <Routes>
-                        <Route path="/" element={<Home />} />
+                        <Route path="/" element={<Chat />} />
                         <Route path="/login" element={<Login />} />
                         <Route path="/signin" element={<Signin />} />
                         <Route path="/user" element={<User setMode={setMode} />} />
