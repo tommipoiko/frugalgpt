@@ -60,7 +60,7 @@ function Chat({ currentChat }) {
                 navigate(`/chats/${threadId}`, { replace: true })
             }
 
-            let accumulatedMessages = [...updatedMessages] // Local copy of accumulated messages
+            let accumulatedMessages = [...updatedMessages]
 
             responseStream.on('textCreated', () => {
                 const newSystemMessage = { id: Date.now(), content: '', role: 'system' }
@@ -89,7 +89,6 @@ function Chat({ currentChat }) {
             })
 
             responseStream.on('end', async () => {
-                // Save the final message state to the database
                 await chatApi.saveCompletedMessage(threadId || id, accumulatedMessages)
             })
         }
@@ -146,9 +145,8 @@ function Chat({ currentChat }) {
             sx={{
                 display: 'flex',
                 flexDirection: 'column',
-                height: 'calc(100vh - 64px)',
-                justifyContent: 'space-between',
-                marginTop: '64px'
+                height: 'calc(100vh - 128px)',
+                justifyContent: 'space-between'
             }}
         >
             <Box

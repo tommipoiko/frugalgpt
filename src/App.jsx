@@ -85,7 +85,7 @@ function App() {
     const [currentChat, setCurrentChat] = useState(null)
     const auth = getAuth()
     const navigate = useNavigate()
-    const location = useLocation() // Add this line
+    const location = useLocation()
     const prefersDarkMode = useMediaQuery('(prefers-color-scheme: dark)')
 
     useEffect(() => {
