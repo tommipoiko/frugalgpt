@@ -1,4 +1,3 @@
-/* eslint-disable max-len */
 import React, { useEffect, useRef, useState } from 'react'
 import {
     Box, Button, IconButton, Paper, Typography, List, ListItem
@@ -139,8 +138,8 @@ function Chat({ currentChat }) {
                 elevation={3}
                 sx={{
                     padding: 2,
-                    backgroundColor: message.role === 'user' ? theme.palette.primary.light : theme.palette.background.paper,
-                    color: message.role === 'user' ? theme.palette.primary.contrastText : theme.palette.text.primary,
+                    backgroundColor: message.role === 'user' ? theme.palette.primary.light : theme.palette.background.paper, // eslint-disable-line max-len
+                    color: message.role === 'user' ? theme.palette.primary.contrastText : theme.palette.text.primary, // eslint-disable-line max-len
                     maxWidth: '90%',
                     whiteSpace: 'pre-wrap'
                 }}
@@ -220,7 +219,11 @@ function Chat({ currentChat }) {
                         alignItems: 'flex-end'
                     }}
                 >
-                    <IconButton color="primary" component="label" sx={{ color: theme.palette.text.primary }}>
+                    <IconButton
+                        color="primary"
+                        component="label"
+                        sx={{ color: theme.palette.text.primary }}
+                    >
                         <AttachFileIcon />
                         <input
                             type="file"
@@ -254,10 +257,10 @@ function Chat({ currentChat }) {
                         sx={{
                             marginLeft: 1,
                             alignSelf: 'flex-end',
-                            backgroundColor: theme.palette.mode === 'dark' ? theme.palette.grey[800] : theme.palette.primary.main,
-                            color: theme.palette.mode === 'dark' ? theme.palette.text.primary : theme.palette.primary.contrastText,
+                            backgroundColor: theme.palette.mode === 'dark' ? theme.palette.grey[800] : theme.palette.primary.main, // eslint-disable-line max-len
+                            color: theme.palette.mode === 'dark' ? theme.palette.text.primary : theme.palette.primary.contrastText, // eslint-disable-line max-len
                             '&:hover': {
-                                backgroundColor: theme.palette.mode === 'dark' ? theme.palette.grey[600] : theme.palette.primary.dark
+                                backgroundColor: theme.palette.mode === 'dark' ? theme.palette.grey[600] : theme.palette.primary.dark // eslint-disable-line max-len
                             }
                         }}
                         endIcon={<SendIcon />}

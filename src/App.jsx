@@ -174,7 +174,7 @@ function App() {
 
     return (
         <ThemeProvider theme={themeConfig}>
-            <CssBaseline />
+            <CssBaseline enableColorScheme />
             <Box sx={{ display: 'flex' }}>
                 <AppBar position="fixed" open={open}>
                     <Toolbar>
