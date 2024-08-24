@@ -1,42 +1,30 @@
-import axios from 'axios'
+import OpenAI from 'openai'
 
-const sendMessage = async (message, apiKey, assistantId) => {
+const createOpenAiClient = (apiKey) => new OpenAI({
+    apiKey,
+    dangerouslyAllowBrowser: true
+})
+
+const sendMessage = async (message, apiKey, assistantId, chatId = null) => {
     try {
-        const url = `https://api.openai.com/v1/assistants/${assistantId}/threads`
+        const openai = createOpenAiClient(apiKey)
+        let threadId = chatId
 
-        const threadResponse = await axios.post(url, {}, {
-            headers: {
-                Authorization: `Bearer ${apiKey}`,
-                'OpenAI-Beta': 'assistants=v2'
-            }
-        })
+        if (!threadId) {
+            const threadResponse = await openai.beta.threads.create()
+            threadId = threadResponse.id
+        }
 
-        const threadId = threadResponse.data.id
-
-        await axios.post(`${url}/${threadId}/messages`, {
+        await openai.beta.threads.messages.create(threadId, {
             role: 'user',
             content: message.text
-        }, {
-            headers: {
-                Authorization: `Bearer ${apiKey}`,
-                'OpenAI-Beta': 'assistants=v2'
-            }
         })
 
-        const responseStream = await axios({
-            method: 'post',
-            url: `${url}/${threadId}/runs/stream`,
-            headers: {
-                Authorization: `Bearer ${apiKey}`,
-                'OpenAI-Beta': 'assistants=v2'
-            },
-            data: {
-                assistant_id: assistantId
-            },
-            responseType: 'stream'
+        const responseStream = openai.beta.threads.runs.stream(threadId, {
+            assistant_id: assistantId
         })
 
-        return responseStream.data
+        return { responseStream, threadId }
     } catch (error) {
         console.error('Error sending message to OpenAI:', error)
         return null

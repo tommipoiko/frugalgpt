@@ -1,8 +1,8 @@
-import { doc, getDoc } from 'firebase/firestore'
+import { doc, getDoc, setDoc } from 'firebase/firestore'
 import openAi from './openAi'
 import { auth, db } from './firebase'
 
-const sendMessage = async (message) => {
+const sendMessage = async (message, chatId = null) => {
     const user = auth.currentUser
     if (!user) return null
 
@@ -18,7 +18,24 @@ const sendMessage = async (message) => {
             return null
         }
 
-        const responseStream = await openAi.sendMessage(message, apiKey, assistantId)
+        const {
+            responseStream,
+            threadId
+        } = await openAi.sendMessage(message, apiKey, assistantId, chatId)
+
+        if (!chatId) {
+            const newChat = {
+                name: `Chat-${threadId}`,
+                threadId,
+                messages: [{ role: 'user', content: message.text }]
+            }
+            await setDoc(doc(db, 'chats', threadId), newChat)
+        } else {
+            await setDoc(doc(db, 'chats', chatId), {
+                messages: [{ role: 'user', content: message.text }]
+            }, { merge: true })
+        }
+
         return responseStream
     }
 

@@ -26,14 +26,36 @@ function Chat() {
         setCurrentMessage('')
         setAttachments([])
 
-        const responseStream = chatApi.sendMessage(newMessage)
+        const responseStream = await chatApi.sendMessage(newMessage)
 
-        responseStream.on('data', (chunk) => {
-            setMessages((prevMessages) => [
-                ...prevMessages,
-                { id: Date.now(), text: chunk, sender: 'system' }
-            ])
-        })
+        if (responseStream) {
+            responseStream.on('textCreated', () => {
+                setMessages((prevMessages) => [
+                    ...prevMessages,
+                    { id: Date.now(), text: '', sender: 'system' }
+                ])
+            })
+
+            responseStream.on('textDelta', (textDelta) => {
+                setMessages((prevMessages) => {
+                    const lastMessage = prevMessages[prevMessages.length - 1]
+                    lastMessage.text += textDelta.value
+                    return [...prevMessages]
+                })
+            })
+
+            responseStream.on('toolCallCreated', (toolCall) => {
+                setMessages((prevMessages) => [
+                    ...prevMessages,
+                    { id: Date.now(), text: `Tool: ${toolCall.type}`, sender: 'system' }
+                ])
+            })
+
+            // eslint-disable-next-line no-unused-vars
+            responseStream.on('toolCallDelta', (toolCallDelta) => {
+                // Additional handling of tool calls can be done here
+            })
+        }
     }
 
     const handleAttachFile = (event) => {
