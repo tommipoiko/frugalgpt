@@ -121,7 +121,8 @@ function Chat() {
                         borderRadius: '4px',
                         border: '1px solid #ccc',
                         resize: 'none',
-                        overflowY: 'auto'
+                        overflowY: 'auto',
+                        fontSize: '16px'
                     }}
                 />
                 <Button
