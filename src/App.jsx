@@ -21,12 +21,13 @@ import ChevronLeftIcon from '@mui/icons-material/ChevronLeft'
 import ChevronRightIcon from '@mui/icons-material/ChevronRight'
 import AccountCircle from '@mui/icons-material/AccountCircle'
 import useMediaQuery from '@mui/material/useMediaQuery'
-import { getAuth, onAuthStateChanged, signOut } from 'firebase/auth'
+import { onAuthStateChanged, signOut } from 'firebase/auth'
 import Login from './components/Login'
 import User from './components/User'
 import Signin from './components/Signin'
 import Sidenav from './components/Sidenav'
 import Chat from './components/Chat'
+import { auth } from './services/firebase'
 
 const drawerWidth = 240
 
@@ -83,7 +84,6 @@ function App() {
     const [open, setOpen] = useState(() => localStorage.getItem('frugalGptSidenav') === 'true')
     const [mode, setMode] = useState(() => localStorage.getItem('frugalGptTheme') || 'system')
     const [currentChat, setCurrentChat] = useState(null)
-    const auth = getAuth()
     const navigate = useNavigate()
     const location = useLocation()
     const prefersDarkMode = useMediaQuery('(prefers-color-scheme: dark)')

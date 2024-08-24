@@ -6,10 +6,12 @@ import AttachFileIcon from '@mui/icons-material/AttachFile'
 import SendIcon from '@mui/icons-material/Send'
 import TextareaAutosize from '@mui/material/TextareaAutosize'
 import { useParams, useNavigate } from 'react-router-dom'
+import { useTheme } from '@mui/material/styles'
 import {
-    doc, getFirestore, onSnapshot
+    doc, onSnapshot
 } from 'firebase/firestore'
 import chatApi from '../services/chatApi'
+import { db } from '../services/firebase'
 
 function Chat({ currentChat }) {
     const [messages, setMessages] = useState([])
@@ -17,9 +19,9 @@ function Chat({ currentChat }) {
     const [attachments, setAttachments] = useState([])
     const { id } = useParams()
     const navigate = useNavigate()
-    const db = getFirestore()
     const listRef = useRef(null)
     const [autoScrollEnabled, setAutoScrollEnabled] = useState(true)
+    const theme = useTheme()
 
     // eslint-disable-next-line consistent-return
     useEffect(() => {
@@ -138,7 +140,8 @@ function Chat({ currentChat }) {
                 elevation={3}
                 sx={{
                     padding: 2,
-                    backgroundColor: message.role === 'user' ? '#e0f7fa' : '#f1f1f1',
+                    backgroundColor: message.role === 'user' ? theme.palette.primary.light : theme.palette.background.paper, // eslint-disable-line max-len
+                    color: message.role === 'user' ? theme.palette.primary.contrastText : theme.palette.text.primary, // eslint-disable-line max-len
                     maxWidth: '75%',
                     whiteSpace: 'pre-wrap'
                 }}
@@ -194,7 +197,11 @@ function Chat({ currentChat }) {
                     handleSendMessage()
                 }}
             >
-                <IconButton color="primary" component="label">
+                <IconButton
+                    color="primary"
+                    component="label"
+                    sx={{ color: theme.palette.text.primary }}
+                >
                     <AttachFileIcon />
                     <input
                         type="file"
@@ -214,7 +221,9 @@ function Chat({ currentChat }) {
                         marginLeft: '8px',
                         padding: '8px',
                         borderRadius: '4px',
-                        border: '1px solid #ccc',
+                        border: `1px solid ${theme.palette.divider}`,
+                        backgroundColor: theme.palette.background.paper,
+                        color: theme.palette.text.primary,
                         resize: 'none',
                         overflowY: 'auto',
                         fontSize: '16px'
@@ -222,9 +231,16 @@ function Chat({ currentChat }) {
                 />
                 <Button
                     variant="contained"
-                    color="primary"
                     type="submit"
-                    sx={{ marginLeft: 1, alignSelf: 'flex-end' }}
+                    sx={{
+                        marginLeft: 1,
+                        alignSelf: 'flex-end',
+                        backgroundColor: theme.palette.mode === 'dark' ? theme.palette.grey[700] : theme.palette.primary.main, // eslint-disable-line max-len
+                        color: theme.palette.mode === 'dark' ? theme.palette.text.primary : theme.palette.primary.contrastText, // eslint-disable-line max-len
+                        '&:hover': {
+                            backgroundColor: theme.palette.mode === 'dark' ? theme.palette.grey[500] : theme.palette.primary.dark // eslint-disable-line max-len
+                        }
+                    }}
                     endIcon={<SendIcon />}
                 >
                     Send

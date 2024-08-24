@@ -3,15 +3,16 @@ import {
     List, ListItem, ListItemText, Typography
 } from '@mui/material'
 import {
-    getFirestore, collection, query, orderBy, onSnapshot,
+    collection, query, orderBy, onSnapshot,
     where
 } from 'firebase/firestore'
+import { db } from '../services/firebase'
 
 function Sidenav({ user, onNavigateChat }) {
     const [chats, setChats] = useState([])
 
     useEffect(() => {
-        const db = getFirestore()
+        // const db = getFirestore()
         const q = query(
             collection(db, 'chats'),
             where('userId', '==', user.uid),
