@@ -23,25 +23,49 @@ const sendMessage = async (message, chatId = null) => {
             threadId
         } = await openAi.sendMessage(message, apiKey, assistantId, chatId)
 
-        if (!chatId) {
+        const chatDocId = chatId || threadId
+
+        const chatDocRef = doc(db, 'chats', chatDocId)
+        const chatSnap = await getDoc(chatDocRef)
+
+        if (chatSnap.exists()) {
+            await setDoc(chatDocRef, {
+                messages: [...chatSnap.data().messages, { role: 'user', content: message.text }]
+            }, { merge: true })
+        } else {
             const newChat = {
-                name: `Chat-${threadId}`,
+                name: `Chat-${chatDocId}`,
                 threadId,
                 messages: [{ role: 'user', content: message.text }]
             }
-            await setDoc(doc(db, 'chats', threadId), newChat)
-        } else {
-            await setDoc(doc(db, 'chats', chatId), {
-                messages: [{ role: 'user', content: message.text }]
-            }, { merge: true })
+            await setDoc(chatDocRef, newChat)
         }
 
-        return responseStream
+        return { responseStream, threadId }
     }
 
     return null
 }
 
+const saveCompletedMessage = async (chatId, completeMessage) => {
+    const chatDocRef = doc(db, 'chats', chatId)
+    const chatSnap = await getDoc(chatDocRef)
+
+    if (chatSnap.exists()) {
+        await setDoc(chatDocRef, {
+            messages: [...chatSnap.data().messages, { role: 'system', content: completeMessage }]
+        }, { merge: true })
+    }
+}
+
+const getChatMessages = async (chatId) => {
+    const chatDocRef = doc(db, 'chats', chatId)
+    const chatSnap = await getDoc(chatDocRef)
+    return chatSnap.exists() ? chatSnap.data().messages : []
+}
+
 export default {
-    sendMessage
+    sendMessage,
+    saveCompletedMessage,
+    getChatMessages
 }

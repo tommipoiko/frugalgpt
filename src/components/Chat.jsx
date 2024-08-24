@@ -1,16 +1,35 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
+import { useParams } from 'react-router-dom'
 import {
     Box, Button, IconButton, Paper, Typography, List, ListItem
 } from '@mui/material'
 import AttachFileIcon from '@mui/icons-material/AttachFile'
 import SendIcon from '@mui/icons-material/Send'
 import TextareaAutosize from '@mui/material/TextareaAutosize'
+import {
+    doc, getDoc, updateDoc, arrayUnion
+} from 'firebase/firestore'
+import { db } from '../services/firebase'
 import chatApi from '../services/chatApi'
 
 function Chat() {
+    const { id } = useParams()
     const [messages, setMessages] = useState([])
     const [currentMessage, setCurrentMessage] = useState('')
     const [attachments, setAttachments] = useState([])
+
+    useEffect(() => {
+        if (id !== 'new' && id) {
+            const loadChatHistory = async () => {
+                const docRef = doc(db, 'chats', id)
+                const docSnap = await getDoc(docRef)
+                if (docSnap.exists()) {
+                    setMessages(docSnap.data().messages || [])
+                }
+            }
+            loadChatHistory()
+        }
+    }, [id])
 
     const handleSendMessage = async () => {
         if (currentMessage.trim() === '') return
@@ -26,7 +45,14 @@ function Chat() {
         setCurrentMessage('')
         setAttachments([])
 
-        const responseStream = await chatApi.sendMessage(newMessage)
+        const {
+            responseStream,
+            threadId
+        } = await chatApi.sendMessage(newMessage, id !== 'new' ? id : null)
+
+        if (id === 'new') {
+            window.history.replaceState(null, null, `/chat/${threadId}`)
+        }
 
         if (responseStream) {
             responseStream.on('textCreated', () => {
@@ -51,9 +77,10 @@ function Chat() {
                 ])
             })
 
-            // eslint-disable-next-line no-unused-vars
-            responseStream.on('toolCallDelta', (toolCallDelta) => {
-                // Additional handling of tool calls can be done here
+            responseStream.on('done', async () => {
+                await updateDoc(doc(db, 'chats', threadId), {
+                    messages: arrayUnion({ role: 'user', content: currentMessage })
+                })
             })
         }
     }
@@ -133,8 +160,7 @@ function Chat() {
                     alignItems: 'flex-end',
                     padding: 1,
                     position: 'sticky',
-                    bottom: 0,
-                    backgroundColor: 'white'
+                    bottom: 0
                 }}
                 onSubmit={(e) => {
                     e.preventDefault()
