@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react'
-import { Route, Routes, useNavigate } from 'react-router-dom'
+import {
+    Route, Routes, useNavigate, useLocation
+} from 'react-router-dom'
 import {
     styled, useTheme, ThemeProvider, createTheme
 } from '@mui/material/styles'
@@ -83,6 +85,7 @@ function App() {
     const [currentChat, setCurrentChat] = useState(null)
     const auth = getAuth()
     const navigate = useNavigate()
+    const location = useLocation() // Add this line
     const prefersDarkMode = useMediaQuery('(prefers-color-scheme: dark)')
 
     useEffect(() => {
@@ -93,6 +96,13 @@ function App() {
 
         return () => unsubscribe()
     }, [auth])
+
+    useEffect(() => {
+        const path = location.pathname.split('/')[2]
+        if (path) {
+            setCurrentChat(path)
+        }
+    }, [location])
 
     const getThemeMode = () => {
         if (mode === 'dark') return 'dark'
@@ -148,7 +158,7 @@ function App() {
             return
         }
         setCurrentChat(id)
-        navigate(`/chat/${id}`)
+        window.history.pushState(null, '', `/chats/${id}`)
     }
 
     return (
@@ -240,7 +250,7 @@ function App() {
                         <Route path="/login" element={<Login />} />
                         <Route path="/signin" element={<Signin />} />
                         <Route path="/user" element={<User setMode={setMode} />} />
-                        <Route path="/chat/:id" element={<Chat currentChat={currentChat} />} />
+                        <Route path="/chats/:id" element={<Chat currentChat={currentChat} />} />
                     </Routes>
                 </Main>
             </Box>

@@ -5,7 +5,7 @@ import {
 import AttachFileIcon from '@mui/icons-material/AttachFile'
 import SendIcon from '@mui/icons-material/Send'
 import TextareaAutosize from '@mui/material/TextareaAutosize'
-import { useParams } from 'react-router-dom'
+import { useParams, useNavigate } from 'react-router-dom'
 import {
     doc, getFirestore, onSnapshot
 } from 'firebase/firestore'
@@ -16,6 +16,7 @@ function Chat({ currentChat }) {
     const [currentMessage, setCurrentMessage] = useState('')
     const [attachments, setAttachments] = useState([])
     const { id } = useParams()
+    const navigate = useNavigate()
     const db = getFirestore()
 
     // eslint-disable-next-line consistent-return
@@ -26,7 +27,6 @@ function Chat({ currentChat }) {
                 if (snapshot.exists()) {
                     const chatData = snapshot.data()
                     setMessages(chatData.messages || [])
-                    console.log(chatData.messages)
                 }
             })
 
@@ -49,9 +49,16 @@ function Chat({ currentChat }) {
         setCurrentMessage('')
         setAttachments([])
 
-        const responseStream = await chatApi.sendMessage(newMessage, id || currentChat)
+        const {
+            responseStream,
+            threadId
+        } = await chatApi.sendMessage(newMessage, id || currentChat)
 
         if (responseStream) {
+            if (!id) {
+                navigate(`/chats/${threadId}`, { replace: true })
+            }
+
             responseStream.on('textCreated', () => {
                 setMessages((prevMessages) => [
                     ...prevMessages,

@@ -40,7 +40,7 @@ const sendMessage = async (message, chatId = null) => {
             })
         }
 
-        return responseStream
+        return { responseStream, threadId }
     }
 
     return null
