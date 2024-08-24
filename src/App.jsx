@@ -46,7 +46,11 @@ const Main = styled('main', { shouldForwardProp: (prop) => prop !== 'open' })(
                 duration: theme.transitions.duration.enteringScreen
             }),
             marginLeft: 0
-        })
+        }),
+        [theme.breakpoints.down('sm')]: {
+            marginLeft: 0,
+            padding: theme.spacing(2)
+        }
     })
 )
 
