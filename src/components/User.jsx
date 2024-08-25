@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import {
-    TextField, Button, Container, Typography, Card, CardContent, Grid, FormControl, InputLabel,
+    TextField, Button, Container, Typography, Card, CardContent, Grid, FormControl,
     Select, MenuItem
 } from '@mui/material'
 import {
@@ -120,11 +120,10 @@ function User({ setMode }) {
                         Theme Preference
                     </Typography>
                     <FormControl fullWidth>
-                        <InputLabel>Theme</InputLabel>
                         <Select
                             value={theme}
-                            label="Theme"
                             onChange={handleThemeChange}
+                            variant="outlined"
                         >
                             <MenuItem value="system">System Default</MenuItem>
                             <MenuItem value="light">Light Mode</MenuItem>
@@ -178,7 +177,7 @@ function User({ setMode }) {
                             <Grid item>
                                 <Button
                                     variant="contained"
-                                    color="secondary"
+                                    color="error"
                                     fullWidth
                                     onClick={handleDeleteApiKey}
                                 >

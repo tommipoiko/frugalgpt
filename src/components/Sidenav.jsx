@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import {
     List, ListItem, ListItemText, IconButton, Menu, MenuItem, ListItemSecondaryAction, Typography,
-    TextField, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, Button
+    Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, Button, TextField
 } from '@mui/material'
 import MoreVertIcon from '@mui/icons-material/MoreVert'
 import ShareIcon from '@mui/icons-material/Share'
@@ -16,11 +16,12 @@ function Sidenav({ user, onNavigateChat }) {
     const [chats, setChats] = useState([])
     const [anchorEl, setAnchorEl] = useState(null)
     const [selectedChat, setSelectedChat] = useState(null)
-    const [isEditing, setIsEditing] = useState(null)
+    const [renameChatId, setRenameChatId] = useState(null)
     const [editedName, setEditedName] = useState('')
     const [deleteChatId, setDeleteChatId] = useState(null)
     const [deleteChatName, setDeleteChatName] = useState('')
     const [openDeleteDialog, setOpenDeleteDialog] = useState(false)
+    const [openRenameDialog, setOpenRenameDialog] = useState(false)
 
     useEffect(() => {
         if (!user) {
@@ -56,27 +57,36 @@ function Sidenav({ user, onNavigateChat }) {
     }
 
     const handleRenameClick = (chatId, currentName) => {
-        setIsEditing(chatId)
+        setRenameChatId(chatId)
         setEditedName(currentName)
+        setOpenRenameDialog(true)
         handleMenuClose()
     }
 
-    const handleRenameSubmit = async () => {
-        if (editedName.trim() && isEditing) {
-            const chatRef = doc(db, 'chats', isEditing)
+    const handleRenameSubmit = async (event) => {
+        console.log('Rename chat: ', editedName)
+        console.log('Chat ID: ', renameChatId)
+        event.preventDefault()
+        if (editedName.trim() && renameChatId) {
+            const chatRef = doc(db, 'chats', renameChatId)
             try {
                 await updateDoc(chatRef, { name: editedName.trim() })
             } catch (error) {
                 console.error('Error renaming chat: ', error)
             } finally {
-                setIsEditing(null)
+                setOpenRenameDialog(false)
+                setSelectedChat(null)
+                setRenameChatId(null)
                 setEditedName('')
             }
+        } else {
+            setOpenRenameDialog(false)
         }
     }
 
-    const handleRenameBlur = () => {
-        handleRenameSubmit()
+    const handleRenameCancel = () => {
+        setOpenRenameDialog(false)
+        setSelectedChat(null)
     }
 
     const handleDeleteClick = (chatId, chatName) => {
@@ -120,29 +130,13 @@ function Sidenav({ user, onNavigateChat }) {
                 </ListItem>
                 {chats.map((chat) => (
                     <ListItem button key={chat.id} onClick={() => onNavigateChat(chat.id)}>
-                        {isEditing === chat.id ? (
-                            <TextField
-                                fullWidth
-                                value={editedName}
-                                onChange={(e) => setEditedName(e.target.value)}
-                                onBlur={handleRenameBlur}
-                                onKeyDown={(e) => {
-                                    if (e.key === 'Enter') {
-                                        e.preventDefault()
-                                        handleRenameSubmit()
-                                    }
-                                }}
-                                autoFocus
-                            />
-                        ) : (
-                            <ListItemText
-                                primary={chat.name}
-                                primaryTypographyProps={{
-                                    noWrap: true,
-                                    title: chat.name
-                                }}
-                            />
-                        )}
+                        <ListItemText
+                            primary={chat.name}
+                            primaryTypographyProps={{
+                                noWrap: true,
+                                title: chat.name
+                            }}
+                        />
                         <ListItemSecondaryAction>
                             <IconButton
                                 edge="end"
@@ -198,12 +192,55 @@ function Sidenav({ user, onNavigateChat }) {
                     Delete
                 </MenuItem>
             </Menu>
+
+            <Dialog
+                open={openRenameDialog}
+                onClose={handleRenameCancel}
+                aria-labelledby="rename-dialog-title"
+                PaperProps={{
+                    component: 'form',
+                    onSubmit: handleRenameSubmit,
+                    style: { maxWidth: '90%', minWidth: '400px' }
+                }}
+            >
+                <DialogTitle id="rename-dialog-title">Rename chat</DialogTitle>
+                <DialogContent>
+                    <DialogContentText>
+                        Enter a new name for the chat
+                    </DialogContentText>
+                    <TextField
+                        autoFocus
+                        required
+                        fullWidth
+                        variant="outlined"
+                        value={editedName}
+                        onChange={(e) => setEditedName(e.target.value)}
+                    />
+                </DialogContent>
+                <DialogActions>
+                    <Button
+                        onClick={handleRenameCancel}
+                        color="primary"
+                        variant="contained"
+                    >
+                        Cancel
+                    </Button>
+                    <Button
+                        type="submit"
+                        color="primary"
+                        variant="contained"
+                    >
+                        Rename
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
             <Dialog
                 open={openDeleteDialog}
                 onClose={handleDeleteCancel}
                 aria-labelledby="delete-dialog-title"
                 aria-describedby="delete-dialog-description"
-                PaperProps={{ style: { maxWidth: '500px' } }}
+                PaperProps={{ style: { maxWidth: '90%', minWidth: '400px' } }}
             >
                 <DialogTitle id="delete-dialog-title">Delete chat?</DialogTitle>
                 <DialogContent>
@@ -215,10 +252,18 @@ function Sidenav({ user, onNavigateChat }) {
                     </DialogContentText>
                 </DialogContent>
                 <DialogActions>
-                    <Button onClick={handleDeleteCancel} color="primary">
+                    <Button
+                        onClick={handleDeleteCancel}
+                        color="primary"
+                        variant="contained"
+                    >
                         Cancel
                     </Button>
-                    <Button onClick={handleDeleteConfirm} color="error">
+                    <Button
+                        onClick={handleDeleteConfirm}
+                        color="error"
+                        variant="contained"
+                    >
                         Delete
                     </Button>
                 </DialogActions>
