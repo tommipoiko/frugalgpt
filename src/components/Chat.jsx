@@ -37,9 +37,13 @@ function Chat({ currentChat }) {
                     }
                 })
                 return () => unsubscribeChat()
+            } else if (user && !id) { // eslint-disable-line no-else-return
+                setCanSendMessages(true)
+                setMessages([])
+            } else {
+                setCanSendMessages(false)
+                setMessages([])
             }
-            setCanSendMessages(false)
-            setMessages([])
         })
 
         return () => unsubscribeAuth()

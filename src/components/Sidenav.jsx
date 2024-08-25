@@ -7,8 +7,7 @@ import ShareIcon from '@mui/icons-material/Share'
 import EditIcon from '@mui/icons-material/Edit'
 import DeleteIcon from '@mui/icons-material/Delete'
 import {
-    collection, query, orderBy, onSnapshot,
-    where
+    collection, query, orderBy, onSnapshot, where, doc, updateDoc, deleteDoc
 } from 'firebase/firestore'
 import { db } from '../services/firebase'
 
@@ -29,9 +28,9 @@ function Sidenav({ user, onNavigateChat }) {
         )
 
         const unsubscribe = onSnapshot(q, (snapshot) => {
-            const chatList = snapshot.docs.map((doc) => ({
-                id: doc.id,
-                ...doc.data()
+            const chatList = snapshot.docs.map((document) => ({
+                id: document.id,
+                ...document.data()
             }))
             setChats(chatList)
         })
@@ -40,28 +39,47 @@ function Sidenav({ user, onNavigateChat }) {
     }, [user])
 
     const handleMenuOpen = (event, chatId) => {
+        event.preventDefault()
         setAnchorEl(event.currentTarget)
         setSelectedChat(chatId)
     }
 
     const handleMenuClose = () => {
         setAnchorEl(null)
-        console.log(selectedChat)
         setSelectedChat(null)
     }
 
-    const handleRename = () => {
-        // Implement rename handler here
-        handleMenuClose()
+    const handleRename = async () => {
+        const newName = prompt('Enter the new name for the chat:')
+        if (newName && selectedChat) {
+            const chatRef = doc(db, 'chats', selectedChat)
+            try {
+                await updateDoc(chatRef, { name: newName })
+                handleMenuClose()
+            } catch (error) {
+                console.error('Error renaming chat: ', error)
+            }
+        }
+    }
+
+    const handleDelete = async () => {
+        const confirmDelete = window.confirm(
+            'Are you sure you want to delete this chat? '
+            + 'This action cannot be undone.'
+        )
+        if (confirmDelete && selectedChat) {
+            const chatRef = doc(db, 'chats', selectedChat)
+            handleMenuClose()
+            try {
+                await deleteDoc(chatRef)
+            } catch (error) {
+                console.error('Error deleting chat: ', error)
+            }
+        }
     }
 
     const handleShare = () => {
         // Implement share handler here
-        handleMenuClose()
-    }
-
-    const handleDelete = () => {
-        // Implement delete handler here
         handleMenuClose()
     }
 
@@ -99,6 +117,15 @@ function Sidenav({ user, onNavigateChat }) {
             )}
             <Menu
                 anchorEl={anchorEl}
+                anchorOrigin={{
+                    vertical: 'bottom',
+                    horizontal: 'left'
+                }}
+                keepMounted
+                transformOrigin={{
+                    vertical: 'top',
+                    horizontal: 'left'
+                }}
                 open={Boolean(anchorEl)}
                 onClose={handleMenuClose}
                 PaperProps={{
