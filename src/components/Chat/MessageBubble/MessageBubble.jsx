@@ -8,15 +8,15 @@ function MessageBubble({ message, theme }) {
         <Paper
             elevation={3}
             sx={{
-                paddingLeft: 2,
-                paddingRight: 2,
+                paddingLeft: 1,
+                paddingRight: 1,
                 backgroundColor: message.role === 'user'
                     ? theme.palette.primary.light
                     : theme.palette.background.paper,
                 color: message.role === 'user'
                     ? theme.palette.primary.contrastText
                     : theme.palette.text.primary,
-                maxWidth: '90%'
+                maxWidth: message.role === 'user' ? '90%' : '100%'
             }}
         >
             <ReactMarkdown
