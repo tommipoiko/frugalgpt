@@ -22,6 +22,8 @@ function Sidenav({ user, onNavigateChat }) {
     const [deleteChatName, setDeleteChatName] = useState('')
     const [openDeleteDialog, setOpenDeleteDialog] = useState(false)
     const [openRenameDialog, setOpenRenameDialog] = useState(false)
+    const [openShareDialog, setOpenShareDialog] = useState(false)
+    const [shareChatLink, setShareChatLink] = useState('')
 
     useEffect(() => {
         if (!user) {
@@ -64,8 +66,6 @@ function Sidenav({ user, onNavigateChat }) {
     }
 
     const handleRenameSubmit = async (event) => {
-        console.log('Rename chat: ', editedName)
-        console.log('Chat ID: ', renameChatId)
         event.preventDefault()
         if (editedName.trim() && renameChatId) {
             const chatRef = doc(db, 'chats', renameChatId)
@@ -117,9 +117,15 @@ function Sidenav({ user, onNavigateChat }) {
         setSelectedChat(null)
     }
 
-    const handleShare = () => {
-        // Implement share handler here
+    const handleShareClick = (chatId) => {
+        const shareLink = `${window.location.origin}/chats/${chatId}`
+        setShareChatLink(shareLink)
+        setOpenShareDialog(true)
         handleMenuClose()
+    }
+
+    const handleShareClose = () => {
+        setOpenShareDialog(false)
     }
 
     return (
@@ -177,7 +183,7 @@ function Sidenav({ user, onNavigateChat }) {
                     }
                 }}
             >
-                <MenuItem onClick={handleShare}>
+                <MenuItem onClick={() => handleShareClick(selectedChat)}>
                     <ShareIcon fontSize="small" sx={{ marginRight: 1 }} />
                     Share
                 </MenuItem>
@@ -192,6 +198,40 @@ function Sidenav({ user, onNavigateChat }) {
                     Delete
                 </MenuItem>
             </Menu>
+
+            <Dialog
+                open={openShareDialog}
+                onClose={handleShareClose}
+                aria-labelledby="share-dialog-title"
+                aria-describedby="share-dialog-description"
+                PaperProps={{ style: { maxWidth: '90%', minWidth: '400px' } }}
+            >
+                <DialogTitle id="share-dialog-title">Share chat</DialogTitle>
+                <DialogContent>
+                    <DialogContentText id="share-dialog-description">
+                        Signed in users can read your chat history using the following link:
+                    </DialogContentText>
+                    <Button
+                        fullWidth
+                        variant="outlined"
+                        sx={{ marginTop: 2 }}
+                        onClick={() => {
+                            navigator.clipboard.writeText(shareChatLink)
+                        }}
+                    >
+                        {shareChatLink}
+                    </Button>
+                </DialogContent>
+                <DialogActions>
+                    <Button
+                        onClick={handleShareClose}
+                        color="primary"
+                        variant="contained"
+                    >
+                        Close
+                    </Button>
+                </DialogActions>
+            </Dialog>
 
             <Dialog
                 open={openRenameDialog}
