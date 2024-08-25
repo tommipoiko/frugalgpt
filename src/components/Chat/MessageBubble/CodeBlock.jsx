@@ -1,5 +1,7 @@
 import React from 'react'
-import { Box, IconButton, Tooltip } from '@mui/material'
+import {
+    Box, IconButton, Tooltip, Typography
+} from '@mui/material'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { materialDark } from 'react-syntax-highlighter/dist/esm/styles/prism'
 import { CopyToClipboard } from 'react-copy-to-clipboard'
@@ -9,33 +11,48 @@ function CodeBlock({
     inline, className, children, ...props
 }) {
     const match = /language-(\w+)/.exec(className || '')
+    const language = match ? match[1] : 'text'
 
     return !inline && match ? (
-        <Box sx={{ position: 'relative' }}>
-            <CopyToClipboard text={String(children).trim()}>
-                <Tooltip title="Copy to clipboard">
-                    <IconButton
-                        size="small"
-                        sx={{
-                            position: 'absolute',
-                            top: 0,
-                            right: 0,
-                            zIndex: 1,
-                            backgroundColor: 'rgba(0, 0, 0, 0.5)',
-                            color: '#fff'
-                        }}
-                    >
-                        <CopyIcon fontSize="small" />
-                    </IconButton>
-                </Tooltip>
-            </CopyToClipboard>
+        <Box sx={{ position: 'relative', borderRadius: 1, overflow: 'hidden' }}>
+            <Box
+                sx={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                    color: '#fff',
+                    padding: '4px 8px',
+                    fontSize: '0.875rem'
+                }}
+            >
+                <Typography variant="caption" color="inherit">
+                    {language}
+                </Typography>
+                <CopyToClipboard text={String(children).trim()}>
+                    <Tooltip title="Copy code">
+                        <IconButton
+                            size="small"
+                            sx={{
+                                color: '#fff',
+                                backgroundColor: 'rgba(0, 0, 0, 0.2)',
+                                '&:hover': {
+                                    backgroundColor: 'rgba(255, 255, 255, 0.2)'
+                                }
+                            }}
+                        >
+                            <CopyIcon fontSize="small" />
+                        </IconButton>
+                    </Tooltip>
+                </CopyToClipboard>
+            </Box>
             <SyntaxHighlighter
                 style={materialDark}
-                language={match[1]}
+                language={language}
                 PreTag="div"
                 customStyle={{
                     margin: 0,
-                    paddingRight: '30px',
+                    padding: '12px',
                     overflowX: 'auto'
                 }}
                 {...props}
