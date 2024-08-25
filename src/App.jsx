@@ -22,9 +22,9 @@ import ChevronRightIcon from '@mui/icons-material/ChevronRight'
 import AccountCircle from '@mui/icons-material/AccountCircle'
 import useMediaQuery from '@mui/material/useMediaQuery'
 import { onAuthStateChanged } from 'firebase/auth'
-import Login from './components/Login'
-import User from './components/User'
 import Signin from './components/Signin'
+import User from './components/User'
+import Signup from './components/Signup'
 import Sidenav from './components/Sidenav'
 import Chat from './components/Chat'
 import { auth } from './services/firebase'
@@ -98,7 +98,7 @@ function App() {
             const redirectPaths = ['chats', 'user']
             if (!currentUser && redirectPaths.includes(location.pathname.split('/')[1])) {
                 const intendedPath = location.pathname
-                navigate(`/login?redirect=${encodeURIComponent(intendedPath)}`)
+                navigate(`/signin?redirect=${encodeURIComponent(intendedPath)}`)
             } else {
                 setUser(currentUser)
                 localStorage.setItem('frugalGptUser', JSON.stringify(currentUser))
@@ -127,12 +127,12 @@ function App() {
         navigate('/user')
     }
 
-    const handleLogout = async () => {
+    const handleSignOut = async () => {
         setAnchorEl(null)
         auth.signOut()
         setUser(null)
         localStorage.removeItem('frugalGptUser')
-        navigate('/login')
+        navigate('/signin')
     }
 
     const toggleDrawerOpen = () => {
@@ -223,12 +223,12 @@ function App() {
                                     onClose={handleMenuClose}
                                 >
                                     <MenuItem onClick={handleSettings}>Settings</MenuItem>
-                                    <MenuItem onClick={handleLogout}>Log out</MenuItem>
+                                    <MenuItem onClick={handleSignOut}>Sign out</MenuItem>
                                 </Menu>
                             </div>
                         ) : (
-                            <Button color="inherit" href="/login">
-                                Login
+                            <Button color="inherit" href="/signin">
+                                Sign in
                             </Button>
                         )}
                     </Toolbar>
@@ -259,8 +259,8 @@ function App() {
                     <DrawerHeader />
                     <Routes>
                         <Route path="/" element={<Chat currentChat={currentChat} />} />
-                        <Route path="/login" element={<Login />} />
                         <Route path="/signin" element={<Signin />} />
+                        <Route path="/signup" element={<Signup />} />
                         <Route path="/user" element={<User setMode={setMode} />} />
                         <Route path="/chats/:id" element={<Chat currentChat={currentChat} />} />
                     </Routes>
