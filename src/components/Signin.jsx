@@ -19,7 +19,8 @@ function Signin() {
         try {
             await createUserWithEmailAndPassword(auth, email, password)
             setMessage('Account created successfully!')
-            navigate('/')
+            const redirectTo = new URLSearchParams(window.location.search).get('redirect')
+            navigate(redirectTo || '/')
         } catch (err) {
             setError(err.message)
         }

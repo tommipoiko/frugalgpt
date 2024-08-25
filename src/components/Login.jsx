@@ -3,7 +3,7 @@ import {
     TextField, Button, Container, Typography
 } from '@mui/material'
 import { signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider } from 'firebase/auth'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom' // Import Link
 import { auth } from '../services/firebase'
 
 function Login() {
@@ -32,6 +32,8 @@ function Login() {
             setError(err.message)
         }
     }
+
+    const redirectParam = new URLSearchParams(window.location.search).get('redirect')
 
     return (
         <Container maxWidth="sm">
@@ -68,7 +70,12 @@ function Login() {
             <Typography align="center" variant="body2" gutterBottom style={{ marginTop: '20px' }}>
                 New here?
                 {' '}
-                <a href="/signin">Create an account</a>
+                <Link to={`/signin${redirectParam
+                    ? `?redirect=${encodeURIComponent(redirectParam)}`
+                    : ''}`}
+                >
+                    Create an account
+                </Link>
             </Typography>
         </Container>
     )
