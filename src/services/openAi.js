@@ -5,7 +5,33 @@ const createOpenAiClient = (apiKey) => new OpenAI({
     dangerouslyAllowBrowser: true
 })
 
-const sendMessage = async (message, apiKey, assistantId, chatId = null) => {
+const sendMessageToCompletions = async (message, apiKey) => {
+    try {
+        const openai = createOpenAiClient(apiKey)
+        const response = await openai.chat.completions.create({
+            model: 'gpt-4o-mini',
+            messages: [
+                {
+                    role: 'system',
+                    content: 'You create short, concise headers from prompts given to you. '
+                    + 'For example from: "Can I utilize Django views in HTML templates?" '
+                    + 'you would create the header: "Using Django Views in HTML".'
+                },
+                {
+                    role: 'user',
+                    content: message.content
+                }
+            ]
+        })
+
+        return response.choices[0].message.content
+    } catch (error) {
+        console.error('Error sending message to OpenAI:', error)
+        return null
+    }
+}
+
+const sendMessageToAssistant = async (message, apiKey, assistantId, chatId = null) => {
     try {
         const openai = createOpenAiClient(apiKey)
         let threadId = chatId
@@ -32,5 +58,6 @@ const sendMessage = async (message, apiKey, assistantId, chatId = null) => {
 }
 
 export default {
-    sendMessage
+    sendMessageToAssistant,
+    sendMessageToCompletions
 }

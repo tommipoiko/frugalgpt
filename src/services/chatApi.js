@@ -4,6 +4,33 @@ import {
 import openAi from './openAi'
 import { auth, db } from './firebase'
 
+const createNameForChat = async (message, threadId) => {
+    const user = auth.currentUser
+    if (!user) return null
+
+    const docRef = doc(db, 'users', user.uid)
+    const docSnap = await getDoc(docRef)
+
+    if (docSnap.exists()) {
+        const data = docSnap.data()
+        const apiKey = data?.openAi?.openaiKey
+
+        if (!apiKey) {
+            return null
+        }
+
+        let response = await openAi.sendMessageToCompletions(message, apiKey)
+
+        if (!response) {
+            response = `Chat-${threadId}`
+        }
+
+        return response
+    }
+
+    return null
+}
+
 const sendMessage = async (message, chatId = null) => {
     const user = auth.currentUser
     if (!user) return null
@@ -23,11 +50,12 @@ const sendMessage = async (message, chatId = null) => {
         const {
             responseStream,
             threadId
-        } = await openAi.sendMessage(message, apiKey, assistantId, chatId)
+        } = await openAi.sendMessageToAssistant(message, apiKey, assistantId, chatId)
 
         if (!chatId) {
+            const newName = await createNameForChat(message, threadId)
             const newChat = {
-                name: `Chat-${threadId}`,
+                name: newName,
                 threadId,
                 userId: user.uid,
                 messages: [{ id: Date.now(), role: 'user', content: message.content }],
