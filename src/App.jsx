@@ -20,6 +20,9 @@ import MenuIcon from '@mui/icons-material/Menu'
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft'
 import ChevronRightIcon from '@mui/icons-material/ChevronRight'
 import AccountCircle from '@mui/icons-material/AccountCircle'
+import SettingsIcon from '@mui/icons-material/Settings'
+import LoginIcon from '@mui/icons-material/Login'
+import LogoutIcon from '@mui/icons-material/Logout'
 import useMediaQuery from '@mui/material/useMediaQuery'
 import { onAuthStateChanged } from 'firebase/auth'
 import Signin from './components/Signin'
@@ -211,7 +214,7 @@ function App() {
                                     id="menu-appbar"
                                     anchorEl={anchorEl}
                                     anchorOrigin={{
-                                        vertical: 'top',
+                                        vertical: 'bottom',
                                         horizontal: 'right'
                                     }}
                                     keepMounted
@@ -221,13 +224,27 @@ function App() {
                                     }}
                                     open={Boolean(anchorEl)}
                                     onClose={handleMenuClose}
+                                    PaperProps={{
+                                        style: {
+                                            padding: '4px 0',
+                                            borderRadius: '8px',
+                                            boxShadow: '0px 4px 12px rgba(0, 0, 0, 0.1)'
+                                        }
+                                    }}
                                 >
-                                    <MenuItem onClick={handleSettings}>Settings</MenuItem>
-                                    <MenuItem onClick={handleSignOut}>Sign out</MenuItem>
+                                    <MenuItem onClick={handleSettings}>
+                                        <SettingsIcon fontSize="small" sx={{ marginRight: 1 }} />
+                                        Settings
+                                    </MenuItem>
+                                    <MenuItem onClick={handleSignOut}>
+                                        <LogoutIcon fontSize="small" sx={{ marginRight: 1 }} />
+                                        Sign out
+                                    </MenuItem>
                                 </Menu>
                             </div>
                         ) : (
                             <Button color="inherit" href="/signin">
+                                <LoginIcon sx={{ marginRight: 1 }} />
                                 Sign in
                             </Button>
                         )}
