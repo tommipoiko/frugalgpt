@@ -9,33 +9,41 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useTheme } from '@mui/material/styles'
 import { doc, onSnapshot } from 'firebase/firestore'
 import chatApi from '../services/chatApi'
-import { db } from '../services/firebase'
+import { db, auth } from '../services/firebase'
 
 function Chat({ currentChat }) {
     const [messages, setMessages] = useState([])
     const [currentMessage, setCurrentMessage] = useState('')
     const [attachments, setAttachments] = useState([])
+    const [canSendMessages, setCanSendMessages] = useState(false)
     const { id } = useParams()
     const navigate = useNavigate()
     const listRef = useRef(null)
     const [autoScrollEnabled, setAutoScrollEnabled] = useState(true)
     const theme = useTheme()
 
-    // eslint-disable-next-line consistent-return
     useEffect(() => {
-        if (id) {
-            const chatDocRef = doc(db, 'chats', id)
-            const unsubscribe = onSnapshot(chatDocRef, (snapshot) => {
-                if (snapshot.exists()) {
-                    const chatData = snapshot.data()
-                    setMessages(chatData.messages || [])
-                }
-            })
+        // eslint-disable-next-line consistent-return
+        const unsubscribeAuth = auth.onAuthStateChanged(async (user) => {
+            if (user && id) {
+                const chatDocRef = doc(db, 'chats', id)
+                const unsubscribeChat = onSnapshot(chatDocRef, (snapshot) => {
+                    if (snapshot.exists()) {
+                        const chatData = snapshot.data()
+                        setMessages(chatData.messages || [])
+                        setCanSendMessages(chatData.userId === user.uid)
+                    } else {
+                        navigate('/')
+                    }
+                })
+                return () => unsubscribeChat()
+            }
+            setCanSendMessages(false)
+            setMessages([])
+        })
 
-            return () => unsubscribe()
-        }
-        setMessages([])
-    }, [id, db])
+        return () => unsubscribeAuth()
+    }, [id, navigate])
 
     useEffect(() => {
         if (autoScrollEnabled && listRef.current) {
@@ -53,7 +61,7 @@ function Chat({ currentChat }) {
     }
 
     const handleSendMessage = async () => {
-        if (currentMessage.trim() === '') return
+        if (currentMessage.trim() === '' || !canSendMessages) return
 
         const newMessage = {
             id: Date.now(),
@@ -138,8 +146,12 @@ function Chat({ currentChat }) {
                 elevation={3}
                 sx={{
                     padding: 2,
-                    backgroundColor: message.role === 'user' ? theme.palette.primary.light : theme.palette.background.paper, // eslint-disable-line max-len
-                    color: message.role === 'user' ? theme.palette.primary.contrastText : theme.palette.text.primary, // eslint-disable-line max-len
+                    backgroundColor: message.role === 'user'
+                        ? theme.palette.primary.light
+                        : theme.palette.background.paper,
+                    color: message.role === 'user'
+                        ? theme.palette.primary.contrastText
+                        : theme.palette.text.primary,
                     maxWidth: '90%',
                     whiteSpace: 'pre-wrap'
                 }}
@@ -223,6 +235,7 @@ function Chat({ currentChat }) {
                         color="primary"
                         component="label"
                         sx={{ color: theme.palette.text.primary }}
+                        disabled={!canSendMessages}
                     >
                         <AttachFileIcon />
                         <input
@@ -250,6 +263,7 @@ function Chat({ currentChat }) {
                             overflowY: 'auto',
                             fontSize: '16px'
                         }}
+                        disabled={!canSendMessages}
                     />
                     <Button
                         variant="contained"
@@ -257,13 +271,22 @@ function Chat({ currentChat }) {
                         sx={{
                             marginLeft: 1,
                             alignSelf: 'flex-end',
-                            backgroundColor: theme.palette.mode === 'dark' ? theme.palette.grey[800] : theme.palette.primary.main, // eslint-disable-line max-len
-                            color: theme.palette.mode === 'dark' ? theme.palette.text.primary : theme.palette.primary.contrastText, // eslint-disable-line max-len
+                            backgroundColor:
+                            theme.palette.mode === 'dark'
+                                ? theme.palette.grey[800]
+                                : theme.palette.primary.main,
+                            color: theme.palette.mode === 'dark'
+                                ? theme.palette.text.primary
+                                : theme.palette.primary.contrastText,
                             '&:hover': {
-                                backgroundColor: theme.palette.mode === 'dark' ? theme.palette.grey[600] : theme.palette.primary.dark // eslint-disable-line max-len
+                                backgroundColor:
+                                theme.palette.mode === 'dark'
+                                    ? theme.palette.grey[600]
+                                    : theme.palette.primary.dark
                             }
                         }}
                         endIcon={<SendIcon />}
+                        disabled={!canSendMessages}
                     >
                         Send
                     </Button>

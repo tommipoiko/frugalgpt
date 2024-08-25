@@ -12,6 +12,10 @@ function Sidenav({ user, onNavigateChat }) {
     const [chats, setChats] = useState([])
 
     useEffect(() => {
+        if (!user) {
+            setChats([])
+            return
+        }
         const q = query(
             collection(db, 'chats'),
             where('userId', '==', user.uid),
@@ -26,7 +30,7 @@ function Sidenav({ user, onNavigateChat }) {
             setChats(chatList)
         })
 
-        return () => unsubscribe()
+        return () => unsubscribe() // eslint-disable-line
     }, [user])
 
     return (

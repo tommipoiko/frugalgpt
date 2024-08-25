@@ -95,19 +95,18 @@ function App() {
 
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-            setUser(currentUser)
-            localStorage.setItem('frugalGptUser', JSON.stringify(currentUser))
+            const redirectPaths = ['chats', 'user']
+            if (!currentUser && redirectPaths.includes(location.pathname.split('/')[1])) {
+                const intendedPath = location.pathname
+                navigate(`/login?redirect=${encodeURIComponent(intendedPath)}`)
+            } else {
+                setUser(currentUser)
+                localStorage.setItem('frugalGptUser', JSON.stringify(currentUser))
+            }
         })
 
         return () => unsubscribe()
-    }, [auth])
-
-    useEffect(() => {
-        const path = location.pathname.split('/')[2]
-        if (path) {
-            setCurrentChat(path)
-        }
-    }, [location])
+    }, [auth, location, navigate])
 
     const getThemeMode = () => {
         if (mode === 'dark') return 'dark'
