@@ -29,7 +29,7 @@ import Signin from './components/Signin'
 import User from './components/User'
 import Signup from './components/Signup'
 import Sidenav from './components/Sidenav'
-import Chat from './components/Chat'
+import Chat from './components/Chat/Chat'
 import { auth } from './services/firebase'
 
 const drawerWidth = 300

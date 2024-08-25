@@ -1,15 +1,16 @@
+// src/components/Chat.jsx
 import React, { useEffect, useRef, useState } from 'react'
 import {
-    Box, Button, IconButton, Paper, Typography, List, ListItem
+    Box, Button, IconButton, List, ListItem, TextareaAutosize
 } from '@mui/material'
 import AttachFileIcon from '@mui/icons-material/AttachFile'
 import SendIcon from '@mui/icons-material/Send'
-import TextareaAutosize from '@mui/material/TextareaAutosize'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useTheme } from '@mui/material/styles'
 import { doc, onSnapshot } from 'firebase/firestore'
-import chatApi from '../services/chatApi'
-import { db, auth } from '../services/firebase'
+import { db, auth } from '../../services/firebase'
+import chatApi from '../../services/chatApi'
+import MessageBubble from './MessageBubble/MessageBubble'
 
 function Chat({ currentChat }) {
     const [messages, setMessages] = useState([])
@@ -43,7 +44,7 @@ function Chat({ currentChat }) {
                     }
                 })
                 return () => unsubscribeChat()
-            } else if (user && !id) { // eslint-disable-line no-else-return
+            } if (user && !id) {
                 setCanSendMessages(true)
                 setMessages([])
                 setChatName('')
@@ -145,43 +146,6 @@ function Chat({ currentChat }) {
         }
     }
 
-    const renderMessage = (message) => (
-        <ListItem
-            key={message.id}
-            sx={{
-                justifyContent: message.role === 'user' ? 'flex-end' : 'flex-start',
-                overflowWrap: 'break-word',
-                wordBreak: 'break-word'
-            }}
-        >
-            <Paper
-                elevation={3}
-                sx={{
-                    padding: 2,
-                    backgroundColor: message.role === 'user'
-                        ? theme.palette.primary.light
-                        : theme.palette.background.paper,
-                    color: message.role === 'user'
-                        ? theme.palette.primary.contrastText
-                        : theme.palette.text.primary,
-                    maxWidth: '90%',
-                    whiteSpace: 'pre-wrap'
-                }}
-            >
-                <Typography variant="body1">{message.content}</Typography>
-                {message.attachments && message.attachments.length > 0 && (
-                    <Box sx={{ marginTop: 1 }}>
-                        {message.attachments.map((attachment) => (
-                            <Typography key={attachment.id} variant="body2" color="textSecondary">
-                                {attachment.name}
-                            </Typography>
-                        ))}
-                    </Box>
-                )}
-            </Paper>
-        </ListItem>
-    )
-
     return (
         <Box
             sx={{
@@ -213,7 +177,20 @@ function Chat({ currentChat }) {
                     }}
                 >
                     <List>
-                        {messages.map((message) => renderMessage(message))}
+                        {messages.map((message) => (
+                            <ListItem
+                                key={message.id}
+                                sx={{
+                                    justifyContent: message.role === 'user'
+                                        ? 'flex-end'
+                                        : 'flex-start',
+                                    overflowWrap: 'break-word',
+                                    wordBreak: 'break-word'
+                                }}
+                            >
+                                <MessageBubble message={message} theme={theme} />
+                            </ListItem>
+                        ))}
                     </List>
                 </Box>
             </Box>
