@@ -20,7 +20,7 @@ const sendMessageToCompletions = async (message, apiKey) => {
                 },
                 {
                     role: 'user',
-                    content: message.content
+                    content: message
                 }
             ]
         })
@@ -44,7 +44,7 @@ const sendMessageToAssistant = async (message, apiKey, assistantId, chatId = nul
 
         await openai.beta.threads.messages.create(threadId, {
             role: 'user',
-            content: message.content
+            content: message
         })
 
         const responseStream = openai.beta.threads.runs.stream(threadId, {

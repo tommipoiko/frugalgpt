@@ -50,10 +50,10 @@ const sendMessage = async (message, chatId = null) => {
         const {
             responseStream,
             threadId
-        } = await openAi.sendMessageToAssistant(message, apiKey, assistantId, chatId)
+        } = await openAi.sendMessageToAssistant(message.content, apiKey, assistantId, chatId)
 
         if (!chatId) {
-            const newName = await createNameForChat(message, threadId)
+            const newName = await createNameForChat(message.content, threadId)
             const newChat = {
                 name: newName,
                 threadId,
