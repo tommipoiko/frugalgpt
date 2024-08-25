@@ -15,7 +15,8 @@ const sendMessageToCompletions = async (message, apiKey) => {
                     role: 'system',
                     content: 'You create short, concise headers from prompts given to you. '
                     + 'For example from: "Can I utilize Django views in HTML templates?" '
-                    + 'you would create the header: "Using Django Views in HTML".'
+                    + 'you would create the header: "Using Django Views in HTML". '
+                    + 'Never do or reply anything but a fitting header!'
                 },
                 {
                     role: 'user',

@@ -16,11 +16,16 @@ function Chat({ currentChat }) {
     const [currentMessage, setCurrentMessage] = useState('')
     const [attachments, setAttachments] = useState([])
     const [canSendMessages, setCanSendMessages] = useState(false)
+    const [chatName, setChatName] = useState('')
     const { id } = useParams()
     const navigate = useNavigate()
     const listRef = useRef(null)
     const [autoScrollEnabled, setAutoScrollEnabled] = useState(true)
     const theme = useTheme()
+
+    useEffect(() => {
+        document.title = chatName || 'FrugalGPT'
+    }, [chatName])
 
     useEffect(() => {
         // eslint-disable-next-line consistent-return
@@ -32,6 +37,7 @@ function Chat({ currentChat }) {
                         const chatData = snapshot.data()
                         setMessages(chatData.messages || [])
                         setCanSendMessages(chatData.userId === user.uid)
+                        setChatName(chatData.name || '')
                     } else {
                         navigate('/')
                     }
@@ -40,9 +46,11 @@ function Chat({ currentChat }) {
             } else if (user && !id) { // eslint-disable-line no-else-return
                 setCanSendMessages(true)
                 setMessages([])
+                setChatName('')
             } else {
                 setCanSendMessages(false)
                 setMessages([])
+                setChatName('')
             }
         })
 
