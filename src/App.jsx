@@ -21,7 +21,7 @@ import ChevronLeftIcon from '@mui/icons-material/ChevronLeft'
 import ChevronRightIcon from '@mui/icons-material/ChevronRight'
 import AccountCircle from '@mui/icons-material/AccountCircle'
 import useMediaQuery from '@mui/material/useMediaQuery'
-import { onAuthStateChanged, signOut } from 'firebase/auth'
+import { onAuthStateChanged } from 'firebase/auth'
 import Login from './components/Login'
 import User from './components/User'
 import Signin from './components/Signin'
@@ -130,7 +130,7 @@ function App() {
 
     const handleLogout = async () => {
         setAnchorEl(null)
-        await signOut(auth)
+        auth.signOut()
         setUser(null)
         localStorage.removeItem('frugalGptUser')
         navigate('/login')

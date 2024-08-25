@@ -15,7 +15,8 @@ function Login() {
     const handleLogin = async () => {
         try {
             await signInWithEmailAndPassword(auth, email, password)
-            navigate('/')
+            const redirectTo = new URLSearchParams(window.location.search).get('redirect')
+            navigate(redirectTo || '/')
         } catch (err) {
             setError(err.message)
         }
@@ -25,7 +26,8 @@ function Login() {
         const provider = new GoogleAuthProvider()
         try {
             await signInWithPopup(auth, provider)
-            navigate('/')
+            const redirectTo = new URLSearchParams(window.location.search).get('redirect')
+            navigate(redirectTo || '/')
         } catch (err) {
             setError(err.message)
         }
