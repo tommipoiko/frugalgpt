@@ -209,7 +209,7 @@ function Chat({ currentChat }) {
                     sx={{
                         display: 'flex',
                         justifyContent: 'center',
-                        padding: 1,
+                        padding: 2,
                         position: 'sticky',
                         bottom: 0,
                         width: '100%',
@@ -225,13 +225,17 @@ function Chat({ currentChat }) {
                             maxWidth: '700px',
                             width: '100%',
                             display: 'flex',
-                            alignItems: 'flex-end'
+                            alignItems: 'flex-end',
+                            padding: '8px 16px',
+                            backgroundColor: theme.palette.background.default,
+                            borderRadius: '30px',
+                            boxShadow: `0px 2px 10px ${theme.palette.divider}`
                         }}
                     >
                         <IconButton
                             color="primary"
                             component="label"
-                            sx={{ color: theme.palette.text.primary }}
+                            sx={{ color: theme.palette.text.primary, paddingBottom: 1.7 }}
                             disabled={!canSendMessages}
                         >
                             <AttachFileIcon />
@@ -243,7 +247,7 @@ function Chat({ currentChat }) {
                         </IconButton>
                         <TextareaAutosize
                             minRows={1}
-                            maxRows={14}
+                            maxRows={6}
                             placeholder="Type your message..."
                             value={currentMessage}
                             onChange={(e) => setCurrentMessage(e.target.value)}
@@ -252,8 +256,10 @@ function Chat({ currentChat }) {
                                 width: '100%',
                                 marginLeft: '8px',
                                 padding: '8px',
-                                borderRadius: '4px',
-                                border: `1px solid ${theme.palette.divider}`,
+                                marginBottom: '8px',
+                                borderRadius: '20px',
+                                border: 'none',
+                                outline: 'none',
                                 backgroundColor: theme.palette.background.paper,
                                 color: theme.palette.text.primary,
                                 resize: 'none',
@@ -267,25 +273,22 @@ function Chat({ currentChat }) {
                             type="submit"
                             sx={{
                                 marginLeft: 1,
-                                alignSelf: 'flex-end',
-                                backgroundColor:
-                                theme.palette.mode === 'dark'
-                                    ? theme.palette.grey[800]
-                                    : theme.palette.primary.main,
-                                color: theme.palette.mode === 'dark'
-                                    ? theme.palette.text.primary
-                                    : theme.palette.primary.contrastText,
+                                borderRadius: '20px',
+                                backgroundColor: theme.palette.primary.main,
+                                color: theme.palette.primary.contrastText,
                                 '&:hover': {
-                                    backgroundColor:
-                                    theme.palette.mode === 'dark'
-                                        ? theme.palette.grey[600]
-                                        : theme.palette.primary.dark
-                                }
+                                    backgroundColor: theme.palette.primary.dark
+                                },
+                                minWidth: '48px',
+                                minHeight: '48px',
+                                padding: 0,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center'
                             }}
-                            endIcon={<SendIcon />}
                             disabled={!canSendMessages || isSendingMessage}
                         >
-                            Send
+                            <SendIcon />
                         </Button>
                     </Box>
                 </Box>
