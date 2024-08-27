@@ -16,6 +16,7 @@ function Chat({ currentChat }) {
     const [currentMessage, setCurrentMessage] = useState('')
     const [attachments, setAttachments] = useState([])
     const [canSendMessages, setCanSendMessages] = useState(false)
+    const [isSendingMessage, setIsSendingMessage] = useState(false)
     const [chatName, setChatName] = useState('')
     const { id } = useParams()
     const navigate = useNavigate()
@@ -83,8 +84,9 @@ function Chat({ currentChat }) {
     }
 
     const handleSendMessage = async () => {
-        if (currentMessage.trim() === '' || !canSendMessages) return
+        if (currentMessage.trim() === '' || !canSendMessages || isSendingMessage) return
 
+        setIsSendingMessage(true)
         const newMessage = {
             id: Date.now(),
             content: currentMessage,
@@ -136,6 +138,7 @@ function Chat({ currentChat }) {
 
             responseStream.on('end', async () => {
                 await chatApi.saveCompletedMessage(threadId || id, accumulatedMessages)
+                setIsSendingMessage(false)
             })
         }
     }
@@ -280,7 +283,7 @@ function Chat({ currentChat }) {
                                 }
                             }}
                             endIcon={<SendIcon />}
-                            disabled={!canSendMessages}
+                            disabled={!canSendMessages || isSendingMessage}
                         >
                             Send
                         </Button>
