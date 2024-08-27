@@ -1,4 +1,3 @@
-// src/components/Chat.jsx
 import React, { useEffect, useRef, useState } from 'react'
 import {
     Box, Button, IconButton, List, ListItem, TextareaAutosize
@@ -200,7 +199,7 @@ function Chat({ currentChat }) {
                     position: 'sticky',
                     bottom: 0,
                     width: '100%',
-                    backgroundColor: theme.palette.background.Paper
+                    backgroundColor: theme.palette.background.paper
                 }}
                 onSubmit={(e) => {
                     e.preventDefault()

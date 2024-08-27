@@ -214,7 +214,14 @@ function Sidenav({ user, onNavigateChat }) {
                     <Button
                         fullWidth
                         variant="outlined"
-                        sx={{ marginTop: 2 }}
+                        sx={{
+                            marginTop: 2,
+                            textAlign: 'left',
+                            whiteSpace: 'nowrap',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            display: 'block'
+                        }}
                         onClick={() => {
                             navigator.clipboard.writeText(shareChatLink)
                         }}
