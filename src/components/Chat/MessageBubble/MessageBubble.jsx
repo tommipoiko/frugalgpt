@@ -38,6 +38,7 @@ function MessageBubble({ message, theme }) {
             sx={{
                 paddingLeft: 2,
                 paddingRight: 2,
+                paddingBottom: 2,
                 backgroundColor: theme.palette.background.paper,
                 color: theme.palette.text.primary,
                 maxWidth: '100%'

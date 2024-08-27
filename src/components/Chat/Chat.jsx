@@ -1,12 +1,12 @@
 import React, { useEffect, useRef, useState } from 'react'
 import {
-    Box, Button, IconButton, List, ListItem, TextareaAutosize
+    Box, Button, IconButton, List, ListItem, TextareaAutosize, Typography
 } from '@mui/material'
 import AttachFileIcon from '@mui/icons-material/AttachFile'
 import SendIcon from '@mui/icons-material/Send'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useTheme } from '@mui/material/styles'
-import { doc, onSnapshot } from 'firebase/firestore'
+import { doc, onSnapshot, getDoc } from 'firebase/firestore'
 import { db, auth } from '../../services/firebase'
 import chatApi from '../../services/chatApi'
 import MessageBubble from './MessageBubble/MessageBubble'
@@ -28,15 +28,25 @@ function Chat({ currentChat }) {
     }, [chatName])
 
     useEffect(() => {
+        const checkApiKey = async (userId) => {
+            const userDocRef = doc(db, 'users', userId)
+            const userDocSnap = await getDoc(userDocRef)
+            if (userDocSnap.exists() && userDocSnap.data().openAi?.openaiKey) {
+                setCanSendMessages(true)
+            } else {
+                setCanSendMessages(false)
+            }
+        }
+
         // eslint-disable-next-line consistent-return
         const unsubscribeAuth = auth.onAuthStateChanged(async (user) => {
             if (user && id) {
+                await checkApiKey(user.uid)
                 const chatDocRef = doc(db, 'chats', id)
                 const unsubscribeChat = onSnapshot(chatDocRef, (snapshot) => {
                     if (snapshot.exists()) {
                         const chatData = snapshot.data()
                         setMessages(chatData.messages || [])
-                        setCanSendMessages(chatData.userId === user.uid)
                         setChatName(chatData.name || '')
                     } else {
                         navigate('/')
@@ -44,7 +54,7 @@ function Chat({ currentChat }) {
                 })
                 return () => unsubscribeChat()
             } if (user && !id) {
-                setCanSendMessages(true)
+                await checkApiKey(user.uid)
                 setMessages([])
                 setChatName('')
             } else {
@@ -88,8 +98,7 @@ function Chat({ currentChat }) {
         setAttachments([])
 
         const {
-            responseStream,
-            threadId
+            responseStream, threadId
         } = await chatApi.sendMessage(newMessage, id || currentChat)
 
         if (responseStream) {
@@ -168,6 +177,7 @@ function Chat({ currentChat }) {
                 <Box
                     sx={{
                         maxWidth: '900px',
+                        width: '100%',
                         padding: 2
                     }}
                 >
@@ -190,91 +200,103 @@ function Chat({ currentChat }) {
                 </Box>
             </Box>
 
-            <Box
-                component="form"
-                sx={{
-                    display: 'flex',
-                    justifyContent: 'center',
-                    padding: 1,
-                    position: 'sticky',
-                    bottom: 0,
-                    width: '100%',
-                    backgroundColor: theme.palette.background.paper
-                }}
-                onSubmit={(e) => {
-                    e.preventDefault()
-                    handleSendMessage()
-                }}
-            >
+            {canSendMessages ? (
                 <Box
+                    component="form"
                     sx={{
-                        maxWidth: '700px',
-                        width: '100%',
                         display: 'flex',
-                        alignItems: 'flex-end'
+                        justifyContent: 'center',
+                        padding: 1,
+                        position: 'sticky',
+                        bottom: 0,
+                        width: '100%',
+                        backgroundColor: theme.palette.background.paper
+                    }}
+                    onSubmit={(e) => {
+                        e.preventDefault()
+                        handleSendMessage()
                     }}
                 >
-                    <IconButton
-                        color="primary"
-                        component="label"
-                        sx={{ color: theme.palette.text.primary }}
-                        disabled={!canSendMessages}
-                    >
-                        <AttachFileIcon />
-                        <input
-                            type="file"
-                            hidden
-                            onChange={handleAttachFile}
-                        />
-                    </IconButton>
-                    <TextareaAutosize
-                        minRows={1}
-                        maxRows={14}
-                        placeholder="Type your message..."
-                        value={currentMessage}
-                        onChange={(e) => setCurrentMessage(e.target.value)}
-                        onKeyDown={handleKeyDown}
-                        style={{
-                            width: '100%',
-                            marginLeft: '8px',
-                            padding: '8px',
-                            borderRadius: '4px',
-                            border: `1px solid ${theme.palette.divider}`,
-                            backgroundColor: theme.palette.background.paper,
-                            color: theme.palette.text.primary,
-                            resize: 'none',
-                            overflowY: 'auto',
-                            fontSize: '16px'
-                        }}
-                        disabled={!canSendMessages}
-                    />
-                    <Button
-                        variant="contained"
-                        type="submit"
+                    <Box
                         sx={{
-                            marginLeft: 1,
-                            alignSelf: 'flex-end',
-                            backgroundColor:
-                            theme.palette.mode === 'dark'
-                                ? theme.palette.grey[800]
-                                : theme.palette.primary.main,
-                            color: theme.palette.mode === 'dark'
-                                ? theme.palette.text.primary
-                                : theme.palette.primary.contrastText,
-                            '&:hover': {
+                            maxWidth: '700px',
+                            width: '100%',
+                            display: 'flex',
+                            alignItems: 'flex-end'
+                        }}
+                    >
+                        <IconButton
+                            color="primary"
+                            component="label"
+                            sx={{ color: theme.palette.text.primary }}
+                            disabled={!canSendMessages}
+                        >
+                            <AttachFileIcon />
+                            <input
+                                type="file"
+                                hidden
+                                onChange={handleAttachFile}
+                            />
+                        </IconButton>
+                        <TextareaAutosize
+                            minRows={1}
+                            maxRows={14}
+                            placeholder="Type your message..."
+                            value={currentMessage}
+                            onChange={(e) => setCurrentMessage(e.target.value)}
+                            onKeyDown={handleKeyDown}
+                            style={{
+                                width: '100%',
+                                marginLeft: '8px',
+                                padding: '8px',
+                                borderRadius: '4px',
+                                border: `1px solid ${theme.palette.divider}`,
+                                backgroundColor: theme.palette.background.paper,
+                                color: theme.palette.text.primary,
+                                resize: 'none',
+                                overflowY: 'auto',
+                                fontSize: '16px'
+                            }}
+                            disabled={!canSendMessages}
+                        />
+                        <Button
+                            variant="contained"
+                            type="submit"
+                            sx={{
+                                marginLeft: 1,
+                                alignSelf: 'flex-end',
                                 backgroundColor:
                                 theme.palette.mode === 'dark'
-                                    ? theme.palette.grey[600]
-                                    : theme.palette.primary.dark
-                            }
-                        }}
-                        endIcon={<SendIcon />}
-                        disabled={!canSendMessages}
-                    >
-                        Send
-                    </Button>
+                                    ? theme.palette.grey[800]
+                                    : theme.palette.primary.main,
+                                color: theme.palette.mode === 'dark'
+                                    ? theme.palette.text.primary
+                                    : theme.palette.primary.contrastText,
+                                '&:hover': {
+                                    backgroundColor:
+                                    theme.palette.mode === 'dark'
+                                        ? theme.palette.grey[600]
+                                        : theme.palette.primary.dark
+                                }
+                            }}
+                            endIcon={<SendIcon />}
+                            disabled={!canSendMessages}
+                        >
+                            Send
+                        </Button>
+                    </Box>
                 </Box>
-            </Box>
+            ) : (
+                <Typography
+                    variant="body1"
+                    color="textSecondary"
+                    align="center"
+                    sx={{ padding: 2 }}
+                >
+                    You cannot send messages because you have no saved API key.
+                    Please go to settings to add one.
+                </Typography>
+            )}
         </Box>
     )
 }
