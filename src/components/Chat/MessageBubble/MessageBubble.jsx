@@ -15,7 +15,8 @@ function MessageBubble({ message, theme }) {
                     paddingRight: 2,
                     backgroundColor: theme.palette.primary.light,
                     color: theme.palette.primary.contrastText,
-                    maxWidth: '90%'
+                    maxWidth: '90%',
+                    whiteSpace: 'pre-wrap'
                 }}
             >
                 {message.content}

@@ -167,7 +167,7 @@ function Chat({ currentChat }) {
             >
                 <Box
                     sx={{
-                        maxWidth: '900px' || '100%',
+                        maxWidth: '900px',
                         padding: 2
                     }}
                 >
