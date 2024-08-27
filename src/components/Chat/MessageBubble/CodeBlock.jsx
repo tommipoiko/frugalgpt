@@ -14,7 +14,16 @@ function CodeBlock({
     const language = match ? match[1] : 'text'
 
     return !inline && match ? (
-        <Box sx={{ position: 'relative', borderRadius: 1, overflow: 'hidden' }}>
+        <Box sx={{
+            borderRadius: 1,
+            maxWidth: '70vw',
+            alignSelf: 'center',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            margin: '0 auto'
+        }}
+        >
             <Box
                 sx={{
                     display: 'flex',
@@ -23,7 +32,8 @@ function CodeBlock({
                     backgroundColor: 'rgba(0, 0, 0, 0.5)',
                     color: '#fff',
                     padding: '4px 8px',
-                    fontSize: '0.875rem'
+                    fontSize: '0.875rem',
+                    width: '100%'
                 }}
             >
                 <Typography variant="caption" color="inherit">
@@ -53,7 +63,8 @@ function CodeBlock({
                 customStyle={{
                     margin: 0,
                     padding: '12px',
-                    overflowX: 'auto'
+                    overflowX: 'auto',
+                    width: '100%'
                 }}
                 {...props}
             >

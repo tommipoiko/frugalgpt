@@ -153,7 +153,6 @@ function Chat({ currentChat }) {
                 flexDirection: 'column',
                 height: 'calc(100vh - 128px)',
                 justifyContent: 'space-between',
-                width: '100%',
                 overflowX: 'hidden'
             }}
         >
@@ -162,18 +161,15 @@ function Chat({ currentChat }) {
                     display: 'flex',
                     justifyContent: 'center',
                     overflowY: 'auto',
-                    flexGrow: 1,
-                    width: '100%'
+                    flexGrow: 1
                 }}
                 ref={listRef}
                 onScroll={handleScroll}
             >
                 <Box
                     sx={{
-                        maxWidth: '900px',
-                        width: '100%',
-                        padding: 2,
-                        boxSizing: 'border-box'
+                        maxWidth: '900px' || '100%',
+                        padding: 2
                     }}
                 >
                     <List>
@@ -204,7 +200,6 @@ function Chat({ currentChat }) {
                     position: 'sticky',
                     bottom: 0,
                     width: '100%',
-                    boxSizing: 'border-box',
                     backgroundColor: theme.palette.background.Paper
                 }}
                 onSubmit={(e) => {
