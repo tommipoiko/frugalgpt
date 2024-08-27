@@ -228,6 +228,8 @@ function Chat({ currentChat }) {
                             padding: '8px 16px',
                             backgroundColor: theme.palette.background.default,
                             borderRadius: '30px',
+                            marginLeft: '8px',
+                            marginRight: '8px',
                             boxShadow: `0px 2px 10px ${theme.palette.divider}`
                         }}
                     >
@@ -273,10 +275,16 @@ function Chat({ currentChat }) {
                             sx={{
                                 marginLeft: 1,
                                 borderRadius: '20px',
-                                backgroundColor: theme.palette.primary.main,
-                                color: theme.palette.primary.contrastText,
+                                backgroundColor: theme.palette.mode === 'dark'
+                                    ? theme.palette.grey[800]
+                                    : theme.palette.primary.main,
+                                color: theme.palette.mode === 'dark'
+                                    ? theme.palette.common.white
+                                    : theme.palette.primary.contrastText,
                                 '&:hover': {
-                                    backgroundColor: theme.palette.primary.dark
+                                    backgroundColor: theme.palette.mode === 'dark'
+                                        ? theme.palette.grey[700]
+                                        : theme.palette.primary.dark
                                 },
                                 minWidth: '48px',
                                 minHeight: '48px',
@@ -287,7 +295,12 @@ function Chat({ currentChat }) {
                             }}
                             disabled={!canSendMessages || isSendingMessage}
                         >
-                            <SendIcon />
+                            <SendIcon sx={{
+                                color: theme.palette.mode === 'dark'
+                                    ? theme.palette.common.white
+                                    : theme.palette.primary.contrastText
+                            }}
+                            />
                         </Button>
                     </Box>
                 </Box>
