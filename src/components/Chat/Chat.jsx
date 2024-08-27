@@ -209,7 +209,6 @@ function Chat({ currentChat }) {
                     sx={{
                         display: 'flex',
                         justifyContent: 'center',
-                        padding: 2,
                         position: 'sticky',
                         bottom: 0,
                         width: '100%',
@@ -247,7 +246,7 @@ function Chat({ currentChat }) {
                         </IconButton>
                         <TextareaAutosize
                             minRows={1}
-                            maxRows={6}
+                            maxRows={10}
                             placeholder="Type your message..."
                             value={currentMessage}
                             onChange={(e) => setCurrentMessage(e.target.value)}
@@ -255,9 +254,9 @@ function Chat({ currentChat }) {
                             style={{
                                 width: '100%',
                                 marginLeft: '8px',
+                                marginRight: '8px',
                                 padding: '8px',
                                 marginBottom: '8px',
-                                borderRadius: '20px',
                                 border: 'none',
                                 outline: 'none',
                                 backgroundColor: theme.palette.background.paper,
@@ -303,6 +302,14 @@ function Chat({ currentChat }) {
                     Please go to settings to add one.
                 </Typography>
             )}
+            <Typography
+                variant="caption"
+                color="textSecondary"
+                align="center"
+                sx={{ paddingTop: 1 }}
+            >
+                The answers can be wrong, check important info.
+            </Typography>
         </Box>
     )
 }
