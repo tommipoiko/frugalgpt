@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import {
     TextField, Button, Container, Typography
 } from '@mui/material'
@@ -11,6 +11,13 @@ function Signin() {
     const [password, setPassword] = useState('')
     const [error, setError] = useState('')
     const navigate = useNavigate()
+    const redirectParam = new URLSearchParams(window.location.search).get('redirect')
+
+    useEffect(() => {
+        if (redirectParam) {
+            setError('You need to sign in to access this page')
+        }
+    }, [redirectParam])
 
     const handleSignin = async () => {
         try {
@@ -31,12 +38,6 @@ function Signin() {
         } catch (err) {
             setError(err.message)
         }
-    }
-
-    const redirectParam = new URLSearchParams(window.location.search).get('redirect')
-
-    if (redirectParam && !error) {
-        setError('You need to sign in to access this page')
     }
 
     return (

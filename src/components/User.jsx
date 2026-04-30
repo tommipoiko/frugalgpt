@@ -10,7 +10,6 @@ import { auth, db } from '../services/firebase'
 
 function User({ setMode }) {
     const [apiKey, setApiKey] = useState('')
-    const [assistantId, setAssistantId] = useState('')
     const [message, setMessage] = useState('')
     const [theme, setTheme] = useState(() => localStorage.getItem('frugalGptTheme') || 'system')
     const [loading, setLoading] = useState(true)
@@ -24,7 +23,6 @@ function User({ setMode }) {
                     const userData = docSnap.data()
                     if (userData.openAi) {
                         setApiKey(userData.openAi.openaiKey || '')
-                        setAssistantId(userData.openAi.assistantId || '')
                     }
                     setMessage('')
                 } else {
@@ -53,11 +51,10 @@ function User({ setMode }) {
             try {
                 await setDoc(doc(db, 'users', auth.currentUser.uid), {
                     openAi: {
-                        openaiKey: apiKey,
-                        assistantId
+                        openaiKey: apiKey
                     }
                 }, { merge: true })
-                setMessage('API Key and Assistant ID saved successfully!')
+                setMessage('API Key saved successfully!')
             } catch (error) {
                 setMessage(`Error saving API Key: ${error.message}`)
             }
@@ -73,8 +70,7 @@ function User({ setMode }) {
                     openAi: {}
                 }, { merge: true })
                 setApiKey('')
-                setAssistantId('')
-                setMessage('API Key and Assistant ID deleted successfully!')
+                setMessage('API Key deleted successfully!')
             } catch (error) {
                 setMessage(`Error deleting API Key: ${error.message}`)
             }
@@ -146,14 +142,6 @@ function User({ setMode }) {
                                 fullWidth
                                 value={apiKey}
                                 onChange={(e) => setApiKey(e.target.value)}
-                                style={{ marginBottom: '10px' }}
-                            />
-                            <TextField
-                                label="Assistant ID"
-                                variant="outlined"
-                                fullWidth
-                                value={assistantId}
-                                onChange={(e) => setAssistantId(e.target.value)}
                             />
                         </Grid>
                         <Grid

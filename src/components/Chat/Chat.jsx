@@ -17,6 +17,8 @@ function Chat({ currentChat }) {
     const [attachments, setAttachments] = useState([])
     const [canSendMessages, setCanSendMessages] = useState(false)
     const [isSendingMessage, setIsSendingMessage] = useState(false)
+    const [sendError, setSendError] = useState('')
+    const [reasoningPreview, setReasoningPreview] = useState('')
     const [chatName, setChatName] = useState('')
     const { id } = useParams()
     const navigate = useNavigate()
@@ -86,60 +88,64 @@ function Chat({ currentChat }) {
     const handleSendMessage = async () => {
         if (currentMessage.trim() === '' || !canSendMessages || isSendingMessage) return
 
+        setSendError('')
+        setReasoningPreview('')
         setIsSendingMessage(true)
+        const preparedAttachments = attachments
+        const outgoingMessage = currentMessage
         const newMessage = {
             id: Date.now(),
-            content: currentMessage,
+            content: outgoingMessage,
             role: 'user',
-            attachments
+            attachments: preparedAttachments
         }
 
         const updatedMessages = [...messages, newMessage]
         setMessages(updatedMessages)
         setCurrentMessage('')
         setAttachments([])
-
-        const {
-            responseStream, threadId
-        } = await chatApi.sendMessage(newMessage, id || currentChat)
-
-        if (responseStream) {
-            if (!id) {
-                navigate(`/chats/${threadId}`, { replace: true })
+        const streamingAssistantMessageId = Date.now() + 1
+        setMessages([
+            ...updatedMessages,
+            {
+                id: streamingAssistantMessageId,
+                content: '',
+                role: 'system'
             }
+        ])
 
-            let accumulatedMessages = [...updatedMessages]
-
-            responseStream.on('textCreated', () => {
-                const newSystemMessage = { id: Date.now(), content: '', role: 'system' }
-                accumulatedMessages = [...accumulatedMessages, newSystemMessage]
-                setMessages(accumulatedMessages)
-            })
-
-            responseStream.on('textDelta', (textDelta) => {
-                accumulatedMessages = accumulatedMessages.map((msg, index) => {
-                    if (index === accumulatedMessages.length - 1) {
-                        return { ...msg, content: msg.content + textDelta.value }
-                    }
-                    return msg
-                })
-                setMessages(accumulatedMessages)
-            })
-
-            responseStream.on('toolCallCreated', (toolCall) => {
-                const toolMessage = {
-                    id: Date.now(),
-                    content: `Tool: ${toolCall.type}`,
-                    role: 'system'
+        try {
+            const { chatId, finalMessages } = await chatApi.sendMessage(
+                newMessage,
+                messages,
+                id || currentChat,
+                (partialAssistantText) => {
+                    setMessages([
+                        ...updatedMessages,
+                        {
+                            id: streamingAssistantMessageId,
+                            content: partialAssistantText,
+                            role: 'system'
+                        }
+                    ])
+                },
+                (reasoningDelta) => {
+                    setReasoningPreview(reasoningDelta)
                 }
-                accumulatedMessages = [...accumulatedMessages, toolMessage]
-                setMessages(accumulatedMessages)
-            })
-
-            responseStream.on('end', async () => {
-                await chatApi.saveCompletedMessage(threadId || id, accumulatedMessages)
-                setIsSendingMessage(false)
-            })
+            )
+            setMessages(finalMessages)
+            setReasoningPreview('')
+            if (!id && chatId) {
+                navigate(`/chats/${chatId}`, { replace: true })
+            }
+        } catch (error) {
+            setSendError(error.message || 'Failed to send message. Please try again.')
+            setReasoningPreview('')
+            setMessages(messages)
+            setCurrentMessage(outgoingMessage)
+            setAttachments(preparedAttachments)
+        } finally {
+            setIsSendingMessage(false)
         }
     }
 
@@ -185,6 +191,20 @@ function Chat({ currentChat }) {
                     }}
                 >
                     <List>
+                        {reasoningPreview && (
+                            <ListItem sx={{ justifyContent: 'center' }}>
+                                <Typography color="textSecondary" fontStyle="italic">
+                                    Thinking...
+                                    {' '}
+                                    {reasoningPreview}
+                                </Typography>
+                            </ListItem>
+                        )}
+                        {sendError && (
+                            <ListItem sx={{ justifyContent: 'center' }}>
+                                <Typography color="error">{sendError}</Typography>
+                            </ListItem>
+                        )}
                         {messages.map((message) => (
                             <ListItem
                                 key={message.id}
