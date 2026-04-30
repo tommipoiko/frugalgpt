@@ -12,6 +12,20 @@ const RESPONSE_OPTIONS = {
     reasoning: { effort: 'medium' },
     tools: [{ type: 'web_search' }]
 }
+const MODEL_BLOCKLIST_SUBSTRINGS = [
+    'audio',
+    'realtime',
+    'transcribe',
+    'tts',
+    'embedding',
+    'image',
+    'moderation',
+    'whisper'
+]
+const sanitizeModelId = (modelId) => {
+    if (typeof modelId !== 'string' || !modelId.trim()) return DEFAULT_MODEL
+    return modelId.trim()
+}
 
 const normalizeMessagesForInput = (messages) => messages
     .filter((message) => message?.content)
@@ -102,14 +116,25 @@ const applyCors = (req, res) => {
     const origin = req.headers.origin || '*'
     res.set('Access-Control-Allow-Origin', origin)
     res.set('Vary', 'Origin')
-    res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization')
+    res.set(
+        'Access-Control-Allow-Headers',
+        'Content-Type, Authorization, X-Requested-With, X-Firebase-AppCheck, x-client-version'
+    )
     res.set('Access-Control-Allow-Methods', 'POST, OPTIONS')
+    res.set('Access-Control-Max-Age', '3600')
 }
 
-const buildAssistantReply = async (messages, apiKey) => {
+const resolveUserApiSettings = async (userId) => {
+    const userDoc = await admin.firestore().collection('users').doc(userId).get()
+    const apiKey = userDoc.data()?.openAi?.openaiKey
+    const selectedModel = sanitizeModelId(userDoc.data()?.openAi?.model || DEFAULT_MODEL)
+    return { apiKey, selectedModel }
+}
+
+const buildAssistantReply = async (messages, apiKey, modelId = DEFAULT_MODEL) => {
     const openai = new OpenAI({ apiKey })
     const response = await openai.responses.create({
-        model: DEFAULT_MODEL,
+        model: modelId,
         input: normalizeMessagesForInput(messages),
         ...RESPONSE_OPTIONS
     })
@@ -146,18 +171,47 @@ const buildAssistantReply = async (messages, apiKey) => {
     return { assistantResponse, title }
 }
 
-const streamAssistantReply = async (messages, apiKey, onDelta, onReasoningDelta) => {
+const streamAssistantReply = async (
+    messages,
+    apiKey,
+    onDelta,
+    onReasoningDelta,
+    onSource,
+    onStatus,
+    modelId = DEFAULT_MODEL
+) => {
     const openai = new OpenAI({ apiKey })
     const responseStream = await openai.responses.create({
-        model: DEFAULT_MODEL,
+        model: modelId,
         input: normalizeMessagesForInput(messages),
         ...RESPONSE_OPTIONS,
         stream: true
     })
 
     let fullText = ''
+    const collectedSources = []
+    const seenSourceUrls = new Set()
+
+    const recordSource = (annotation) => {
+        if (!annotation?.url || seenSourceUrls.has(annotation.url)) return
+        seenSourceUrls.add(annotation.url)
+        const source = {
+            url: annotation.url,
+            title: annotation.title || ''
+        }
+        collectedSources.push(source)
+        if (onSource) onSource(source)
+    }
+    const emitStatus = (state, message) => {
+        if (onStatus) {
+            onStatus({ state, message })
+        }
+    }
+    emitStatus('thinking', 'Analyzing your request...')
+
     for await (const event of responseStream) {
         if (event.type === 'response.output_text.delta' && event.delta) {
+            emitStatus('responding', 'Generating answer...')
             fullText += event.delta
             onDelta(event.delta)
         }
@@ -169,7 +223,35 @@ const streamAssistantReply = async (messages, apiKey, onDelta, onReasoningDelta)
             )
             && event.delta
         ) {
+            emitStatus('thinking', 'Reasoning...')
             onReasoningDelta(event.delta)
+        }
+
+        if (
+            event.type.includes('web_search')
+            || event.type.includes('file_search')
+            || event.type.includes('tool_call')
+        ) {
+            emitStatus('searching', 'Searching the web...')
+        }
+
+        if (
+            event.type === 'response.output_text.annotation.added'
+            && event.annotation?.type === 'url_citation'
+        ) {
+            recordSource(event.annotation)
+        }
+
+        if (event.type === 'response.completed' && event.response?.output) {
+            event.response.output.forEach((outputItem) => {
+                outputItem?.content?.forEach?.((contentPart) => {
+                    contentPart?.annotations?.forEach?.((annotation) => {
+                        if (annotation?.type === 'url_citation') {
+                            recordSource(annotation)
+                        }
+                    })
+                })
+            })
         }
     }
 
@@ -201,11 +283,11 @@ const streamAssistantReply = async (messages, apiKey, onDelta, onReasoningDelta)
         title = titleResponse.output_text?.trim() || null
     }
 
-    return { assistantResponse: fullText, title }
+    return { assistantResponse: fullText, title, sources: collectedSources }
 }
 
 exports.generateChatResponseHttp = onRequest(
-    { region: FUNCTION_REGION },
+    { region: FUNCTION_REGION, timeoutSeconds: 300 },
     async (req, res) => {
         applyCors(req, res)
 
@@ -236,15 +318,14 @@ exports.generateChatResponseHttp = onRequest(
                 return
             }
 
-            const userDoc = await admin.firestore().collection('users').doc(userId).get()
-            const apiKey = userDoc.data()?.openAi?.openaiKey
+            const { apiKey, selectedModel } = await resolveUserApiSettings(userId)
 
             if (!apiKey) {
                 res.status(412).json({ error: 'OpenAI API key is missing.' })
                 return
             }
 
-            const result = await buildAssistantReply(messages, apiKey)
+            const result = await buildAssistantReply(messages, apiKey, selectedModel)
             res.status(200).json(result)
         } catch (error) {
             console.error('generateChatResponseHttp failed:', error)
@@ -277,7 +358,7 @@ exports.generateChatResponseHttp = onRequest(
 )
 
 exports.generateChatResponseStreamHttp = onRequest(
-    { region: FUNCTION_REGION },
+    { region: FUNCTION_REGION, timeoutSeconds: 300 },
     async (req, res) => {
         applyCors(req, res)
 
@@ -308,8 +389,7 @@ exports.generateChatResponseStreamHttp = onRequest(
                 return
             }
 
-            const userDoc = await admin.firestore().collection('users').doc(userId).get()
-            const apiKey = userDoc.data()?.openAi?.openaiKey
+            const { apiKey, selectedModel } = await resolveUserApiSettings(userId)
 
             if (!apiKey) {
                 res.status(412).json({ error: 'OpenAI API key is missing.' })
@@ -319,6 +399,9 @@ exports.generateChatResponseStreamHttp = onRequest(
             res.setHeader('Content-Type', 'application/x-ndjson; charset=utf-8')
             res.setHeader('Cache-Control', 'no-cache, no-transform')
             res.setHeader('Connection', 'keep-alive')
+            // Flush an immediate event so proxies/browsers don't time out
+            // waiting for the first streamed token on complex prompts.
+            res.write(`${JSON.stringify({ type: 'status', state: 'started' })}\n`)
 
             const result = await streamAssistantReply(
                 messages,
@@ -328,7 +411,14 @@ exports.generateChatResponseStreamHttp = onRequest(
                 },
                 (reasoningDelta) => {
                     res.write(`${JSON.stringify({ type: 'reasoning', delta: reasoningDelta })}\n`)
-                }
+                },
+                (source) => {
+                    res.write(`${JSON.stringify({ type: 'source', source })}\n`)
+                },
+                (status) => {
+                    res.write(`${JSON.stringify({ type: 'status', ...status })}\n`)
+                },
+                selectedModel
             )
 
             res.write(`${JSON.stringify({ type: 'done', ...result })}\n`)
@@ -358,6 +448,67 @@ exports.generateChatResponseStreamHttp = onRequest(
 
             res.status(500).json({
                 error: openAiMessage || 'Failed generating response.'
+            })
+        }
+    }
+)
+
+exports.listAvailableModelsHttp = onRequest(
+    { region: FUNCTION_REGION },
+    async (req, res) => {
+        applyCors(req, res)
+
+        if (req.method === 'OPTIONS') {
+            res.status(204).send('')
+            return
+        }
+
+        if (req.method !== 'POST') {
+            res.status(405).json({ error: 'Method not allowed' })
+            return
+        }
+
+        try {
+            const authHeader = req.headers.authorization || ''
+            if (!authHeader.startsWith('Bearer ')) {
+                res.status(401).json({ error: 'Missing bearer token' })
+                return
+            }
+
+            const idToken = authHeader.replace('Bearer ', '')
+            const decodedToken = await admin.auth().verifyIdToken(idToken)
+            const userId = decodedToken.uid
+            const { apiKey } = await resolveUserApiSettings(userId)
+
+            if (!apiKey) {
+                res.status(412).json({ error: 'OpenAI API key is missing.' })
+                return
+            }
+
+            const openai = new OpenAI({ apiKey })
+            const modelsResponse = await openai.models.list()
+            const models = (modelsResponse.data || [])
+                .map((model) => model?.id)
+                .filter(Boolean)
+                .filter((modelId) => !MODEL_BLOCKLIST_SUBSTRINGS.some(
+                    (blocked) => modelId.includes(blocked)
+                ))
+                .sort((a, b) => a.localeCompare(b))
+                .map((id) => ({ id }))
+
+            res.status(200).json({ models, defaultModel: DEFAULT_MODEL })
+        } catch (error) {
+            console.error('listAvailableModelsHttp failed:', error)
+            const openAiMessage = error?.error?.message || error?.message || ''
+            const openAiStatus = Number(error?.status)
+            if (openAiStatus === 401) {
+                res.status(401).json({
+                    error: 'OpenAI rejected this API key. Please update your key in settings.'
+                })
+                return
+            }
+            res.status(500).json({
+                error: openAiMessage || 'Failed fetching available models.'
             })
         }
     }

@@ -1,15 +1,19 @@
 import React, { useEffect, useRef, useState } from 'react'
 import {
-    Box, Button, IconButton, List, ListItem, TextareaAutosize, Typography
+    Box, IconButton, TextareaAutosize, Typography, Tooltip
 } from '@mui/material'
-import AttachFileIcon from '@mui/icons-material/AttachFile'
-import SendIcon from '@mui/icons-material/Send'
+import AttachFileRoundedIcon from '@mui/icons-material/AttachFileRounded'
+import ArrowUpwardRoundedIcon from '@mui/icons-material/ArrowUpwardRounded'
+import StopRoundedIcon from '@mui/icons-material/StopRounded'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useTheme } from '@mui/material/styles'
 import { doc, onSnapshot, getDoc } from 'firebase/firestore'
 import { db, auth } from '../../services/firebase'
 import chatApi from '../../services/chatApi'
 import MessageBubble from './MessageBubble/MessageBubble'
+import EmptyState from './EmptyState'
+import ThinkingIndicator from './ThinkingIndicator'
+import { brandGradient } from '../../theme'
 
 function Chat({ currentChat }) {
     const [messages, setMessages] = useState([])
@@ -19,10 +23,12 @@ function Chat({ currentChat }) {
     const [isSendingMessage, setIsSendingMessage] = useState(false)
     const [sendError, setSendError] = useState('')
     const [reasoningPreview, setReasoningPreview] = useState('')
+    const [statusPreview, setStatusPreview] = useState('')
     const [chatName, setChatName] = useState('')
     const { id } = useParams()
     const navigate = useNavigate()
     const listRef = useRef(null)
+    const composerRef = useRef(null)
     const [autoScrollEnabled, setAutoScrollEnabled] = useState(true)
     const theme = useTheme()
 
@@ -78,10 +84,8 @@ function Chat({ currentChat }) {
 
     const handleScroll = () => {
         if (!listRef.current) return
-
         const isAtBottom = listRef.current.scrollHeight - listRef.current.scrollTop
-            === listRef.current.clientHeight
-
+            <= listRef.current.clientHeight + 12
         setAutoScrollEnabled(isAtBottom)
     }
 
@@ -90,6 +94,7 @@ function Chat({ currentChat }) {
 
         setSendError('')
         setReasoningPreview('')
+        setStatusPreview('Preparing response...')
         setIsSendingMessage(true)
         const preparedAttachments = attachments
         const outgoingMessage = currentMessage
@@ -104,13 +109,16 @@ function Chat({ currentChat }) {
         setMessages(updatedMessages)
         setCurrentMessage('')
         setAttachments([])
+        // Keep the composer active so the user can continue typing immediately.
+        requestAnimationFrame(() => composerRef.current?.focus())
         const streamingAssistantMessageId = Date.now() + 1
         setMessages([
             ...updatedMessages,
             {
                 id: streamingAssistantMessageId,
                 content: '',
-                role: 'system'
+                role: 'system',
+                sources: []
             }
         ])
 
@@ -120,27 +128,38 @@ function Chat({ currentChat }) {
                 messages,
                 id || currentChat,
                 (partialAssistantText) => {
-                    setMessages([
-                        ...updatedMessages,
-                        {
-                            id: streamingAssistantMessageId,
-                            content: partialAssistantText,
-                            role: 'system'
+                    setMessages((prev) => prev.map((msg) => {
+                        if (msg.id === streamingAssistantMessageId) {
+                            return { ...msg, content: partialAssistantText }
                         }
-                    ])
+                        return msg
+                    }))
                 },
                 (reasoningDelta) => {
                     setReasoningPreview(reasoningDelta)
+                },
+                (sources) => {
+                    setMessages((prev) => prev.map((msg) => {
+                        if (msg.id === streamingAssistantMessageId) {
+                            return { ...msg, sources }
+                        }
+                        return msg
+                    }))
+                },
+                (status) => {
+                    setStatusPreview(status.message || '')
                 }
             )
             setMessages(finalMessages)
             setReasoningPreview('')
+            setStatusPreview('')
             if (!id && chatId) {
                 navigate(`/chats/${chatId}`, { replace: true })
             }
         } catch (error) {
             setSendError(error.message || 'Failed to send message. Please try again.')
             setReasoningPreview('')
+            setStatusPreview('')
             setMessages(messages)
             setCurrentMessage(outgoingMessage)
             setAttachments(preparedAttachments)
@@ -163,186 +182,249 @@ function Chat({ currentChat }) {
         }
     }
 
+    const handleSelectSuggestion = (suggestion) => {
+        setCurrentMessage(suggestion)
+        composerRef.current?.focus()
+    }
+
+    const isEmpty = messages.length === 0 && !isSendingMessage
+
     return (
         <Box
             sx={{
                 display: 'flex',
                 flexDirection: 'column',
-                height: 'calc(100vh - 128px)',
-                justifyContent: 'space-between',
-                overflowX: 'hidden'
+                height: 'calc(100vh - 64px)',
+                position: 'relative'
             }}
         >
             <Box
-                sx={{
-                    display: 'flex',
-                    justifyContent: 'center',
-                    overflowY: 'auto',
-                    flexGrow: 1
-                }}
                 ref={listRef}
                 onScroll={handleScroll}
+                sx={{
+                    flex: 1,
+                    overflowY: 'auto',
+                    overflowX: 'hidden',
+                    display: 'flex',
+                    justifyContent: 'center'
+                }}
             >
                 <Box
                     sx={{
-                        maxWidth: '900px',
                         width: '100%',
-                        padding: 2
+                        maxWidth: 800,
+                        px: { xs: 2, sm: 3 },
+                        pt: { xs: 2, sm: 3 },
+                        pb: 2,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: 3
                     }}
                 >
-                    <List>
-                        {reasoningPreview && (
-                            <ListItem sx={{ justifyContent: 'center' }}>
-                                <Typography color="textSecondary" fontStyle="italic">
-                                    Thinking...
-                                    {' '}
-                                    {reasoningPreview}
-                                </Typography>
-                            </ListItem>
-                        )}
-                        {sendError && (
-                            <ListItem sx={{ justifyContent: 'center' }}>
-                                <Typography color="error">{sendError}</Typography>
-                            </ListItem>
-                        )}
-                        {messages.map((message) => (
-                            <ListItem
-                                key={message.id}
-                                sx={{
-                                    justifyContent: message.role === 'user'
-                                        ? 'flex-end'
-                                        : 'flex-start',
-                                    overflowWrap: 'break-word',
-                                    wordBreak: 'break-word'
-                                }}
-                            >
-                                <MessageBubble message={message} theme={theme} />
-                            </ListItem>
-                        ))}
-                    </List>
+                    {isEmpty && (
+                        <EmptyState onSelectSuggestion={handleSelectSuggestion} />
+                    )}
+
+                    {!isEmpty && messages.map((message) => (
+                        <Box
+                            key={message.id}
+                            sx={{
+                                display: 'flex',
+                                justifyContent: message.role === 'user'
+                                    ? 'flex-end'
+                                    : 'flex-start',
+                                width: '100%'
+                            }}
+                        >
+                            <MessageBubble message={message} theme={theme} />
+                        </Box>
+                    ))}
+
+                    {(reasoningPreview || statusPreview) && (
+                        <Box sx={{ display: 'flex', justifyContent: 'flex-start' }}>
+                            <ThinkingIndicator text={reasoningPreview || statusPreview} />
+                        </Box>
+                    )}
+
+                    {sendError && (
+                        <Box
+                            sx={{
+                                display: 'flex',
+                                justifyContent: 'center',
+                                py: 1
+                            }}
+                        >
+                            <Typography color="error" variant="body2">
+                                {sendError}
+                            </Typography>
+                        </Box>
+                    )}
                 </Box>
             </Box>
 
-            {canSendMessages ? (
-                <Box
-                    component="form"
-                    sx={{
-                        display: 'flex',
-                        justifyContent: 'center',
-                        position: 'sticky',
-                        bottom: 0,
-                        width: '100%',
-                        backgroundColor: theme.palette.background.paper
-                    }}
-                    onSubmit={(e) => {
-                        e.preventDefault()
-                        handleSendMessage()
-                    }}
-                >
-                    <Box
-                        sx={{
-                            maxWidth: '700px',
-                            width: '100%',
-                            display: 'flex',
-                            alignItems: 'flex-end',
-                            padding: '8px 16px',
-                            backgroundColor: theme.palette.background.default,
-                            borderRadius: '30px',
-                            marginLeft: '8px',
-                            marginRight: '8px',
-                            boxShadow: `0px 2px 10px ${theme.palette.divider}`
-                        }}
-                    >
-                        <IconButton
-                            color="primary"
-                            component="label"
-                            sx={{ color: theme.palette.text.primary, paddingBottom: 1.7 }}
-                            disabled={!canSendMessages}
-                        >
-                            <AttachFileIcon />
-                            <input
-                                type="file"
-                                hidden
-                                onChange={handleAttachFile}
-                            />
-                        </IconButton>
-                        <TextareaAutosize
-                            minRows={1}
-                            maxRows={10}
-                            placeholder="Type your message..."
-                            value={currentMessage}
-                            onChange={(e) => setCurrentMessage(e.target.value)}
-                            onKeyDown={handleKeyDown}
-                            style={{
-                                width: '100%',
-                                marginLeft: '8px',
-                                marginRight: '8px',
-                                padding: '8px',
-                                marginBottom: '8px',
-                                border: 'none',
-                                outline: 'none',
-                                backgroundColor: theme.palette.background.paper,
-                                color: theme.palette.text.primary,
-                                resize: 'none',
-                                overflowY: 'auto',
-                                fontSize: '16px'
-                            }}
-                            disabled={!canSendMessages}
-                        />
-                        <Button
-                            variant="contained"
-                            type="submit"
-                            sx={{
-                                marginLeft: 1,
-                                borderRadius: '20px',
-                                backgroundColor: theme.palette.mode === 'dark'
-                                    ? theme.palette.grey[800]
-                                    : theme.palette.primary.main,
-                                color: theme.palette.mode === 'dark'
-                                    ? theme.palette.common.white
-                                    : theme.palette.primary.contrastText,
-                                '&:hover': {
-                                    backgroundColor: theme.palette.mode === 'dark'
-                                        ? theme.palette.grey[700]
-                                        : theme.palette.primary.dark
-                                },
-                                minWidth: '48px',
-                                minHeight: '48px',
-                                padding: 0,
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center'
-                            }}
-                            disabled={!canSendMessages || isSendingMessage}
-                        >
-                            <SendIcon sx={{
-                                color: theme.palette.mode === 'dark'
-                                    ? theme.palette.common.white
-                                    : theme.palette.primary.contrastText
-                            }}
-                            />
-                        </Button>
-                    </Box>
-                </Box>
-            ) : (
-                <Typography
-                    variant="body1"
-                    color="textSecondary"
-                    align="center"
-                    sx={{ padding: 2 }}
-                >
-                    You cannot send messages because you have no saved API key.
-                    Please go to settings to add one.
-                </Typography>
-            )}
-            <Typography
-                variant="caption"
-                color="textSecondary"
-                align="center"
-                sx={{ paddingTop: 1 }}
+            <Box
+                sx={{
+                    position: 'sticky',
+                    bottom: 0,
+                    width: '100%',
+                    backgroundImage: theme.palette.mode === 'dark'
+                        ? 'linear-gradient(to top, rgba(11,11,15,1) 60%, rgba(11,11,15,0))'
+                        : 'linear-gradient(to top, rgba(247,247,248,1) 60%, rgba(247,247,248,0))',
+                    pt: 2,
+                    pb: 1.5,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center'
+                }}
             >
-                The answers can be wrong, check important info.
-            </Typography>
+                <Box
+                    sx={{
+                        width: '100%',
+                        maxWidth: 760,
+                        px: { xs: 2, sm: 3 }
+                    }}
+                >
+                    {canSendMessages ? (
+                        <Box
+                            component="form"
+                            onSubmit={(e) => {
+                                e.preventDefault()
+                                handleSendMessage()
+                            }}
+                            sx={{
+                                display: 'flex',
+                                alignItems: 'flex-end',
+                                gap: 1,
+                                p: 1,
+                                borderRadius: '24px',
+                                backgroundColor: 'background.paper',
+                                border: `1px solid ${theme.palette.divider}`,
+                                boxShadow: theme.palette.mode === 'dark'
+                                    ? '0 8px 32px -16px rgba(0,0,0,0.6)'
+                                    : '0 8px 32px -16px rgba(15,23,42,0.12)',
+                                transition: 'border-color 120ms ease, box-shadow 120ms ease',
+                                '&:focus-within': {
+                                    borderColor: 'primary.main',
+                                    boxShadow: theme.palette.mode === 'dark'
+                                        ? '0 0 0 3px rgba(52,211,153,0.20)'
+                                        : '0 0 0 3px rgba(16,185,129,0.18)'
+                                }
+                            }}
+                        >
+                            <Tooltip title="Attach file">
+                                <IconButton
+                                    component="label"
+                                    sx={{
+                                        color: 'text.secondary',
+                                        alignSelf: 'flex-end',
+                                        mb: 0.5
+                                    }}
+                                    disabled={!canSendMessages || isSendingMessage}
+                                >
+                                    <AttachFileRoundedIcon fontSize="small" />
+                                    <input
+                                        type="file"
+                                        hidden
+                                        onChange={handleAttachFile}
+                                    />
+                                </IconButton>
+                            </Tooltip>
+                            <TextareaAutosize
+                                ref={composerRef}
+                                minRows={1}
+                                maxRows={10}
+                                placeholder="Ask anything..."
+                                value={currentMessage}
+                                onChange={(e) => setCurrentMessage(e.target.value)}
+                                onKeyDown={handleKeyDown}
+                                style={{
+                                    flex: 1,
+                                    padding: '10px 8px',
+                                    border: 'none',
+                                    outline: 'none',
+                                    backgroundColor: 'transparent',
+                                    color: theme.palette.text.primary,
+                                    resize: 'none',
+                                    fontSize: '0.95rem',
+                                    fontFamily: theme.typography.fontFamily,
+                                    lineHeight: 1.5
+                                }}
+                                disabled={!canSendMessages}
+                            />
+                            <Tooltip title={isSendingMessage ? 'Generating...' : 'Send'}>
+                                <span>
+                                    <IconButton
+                                        type="submit"
+                                        disabled={
+                                            !canSendMessages
+                                            || isSendingMessage
+                                            || currentMessage.trim() === ''
+                                        }
+                                        sx={{
+                                            alignSelf: 'flex-end',
+                                            mb: 0.5,
+                                            width: 36,
+                                            height: 36,
+                                            color: '#fff',
+                                            backgroundImage: brandGradient,
+                                            '&:hover': {
+                                                backgroundImage: brandGradient,
+                                                filter: 'brightness(1.05)'
+                                            },
+                                            '&.Mui-disabled': {
+                                                backgroundImage: 'none',
+                                                backgroundColor: (
+                                                    theme.palette.action.disabledBackground
+                                                ),
+                                                color: theme.palette.action.disabled
+                                            }
+                                        }}
+                                    >
+                                        {isSendingMessage
+                                            ? <StopRoundedIcon fontSize="small" />
+                                            : <ArrowUpwardRoundedIcon fontSize="small" />}
+                                    </IconButton>
+                                </span>
+                            </Tooltip>
+                        </Box>
+                    ) : (
+                        <Box
+                            sx={{
+                                p: 2.5,
+                                borderRadius: 3,
+                                backgroundColor: 'background.paper',
+                                border: `1px solid ${theme.palette.divider}`,
+                                textAlign: 'center'
+                            }}
+                        >
+                            <Typography variant="body2" color="text.secondary">
+                                You cannot send messages because you have no saved API key.
+                                {' '}
+                                <Box
+                                    component="span"
+                                    onClick={() => navigate('/user')}
+                                    sx={{
+                                        color: 'primary.main',
+                                        cursor: 'pointer',
+                                        fontWeight: 600,
+                                        '&:hover': { textDecoration: 'underline' }
+                                    }}
+                                >
+                                    Add one in settings.
+                                </Box>
+                            </Typography>
+                        </Box>
+                    )}
+                    <Typography
+                        variant="caption"
+                        color="text.secondary"
+                        align="center"
+                        sx={{ display: 'block', mt: 1 }}
+                    >
+                        FrugalGPT can make mistakes. Verify important info.
+                    </Typography>
+                </Box>
+            </Box>
         </Box>
     )
 }

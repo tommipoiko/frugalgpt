@@ -18,6 +18,9 @@ const toOpenAiMessages = (messages) => messages
 const CHAT_RESPONSE_STREAM_HTTP_URL = process.env.REACT_APP_CHAT_RESPONSE_STREAM_HTTP_URL
     || 'https://europe-north1-frugalgpt.cloudfunctions.net/'
     + 'generateChatResponseStreamHttp'
+const LIST_AVAILABLE_MODELS_HTTP_URL = process.env.REACT_APP_LIST_AVAILABLE_MODELS_HTTP_URL
+    || 'https://europe-north1-frugalgpt.cloudfunctions.net/'
+    + 'listAvailableModelsHttp'
 
 const parseStreamEventLines = (rawChunk) => rawChunk
     .split('\n')
@@ -37,7 +40,9 @@ const sendMessage = async (
     existingMessages = [],
     chatId = null,
     onAssistantDelta = null,
-    onReasoningDelta = null
+    onReasoningDelta = null,
+    onSourcesUpdate = null,
+    onStatusUpdate = null
 ) => {
     const user = auth.currentUser
     if (!user) {
@@ -91,6 +96,16 @@ const sendMessage = async (
     let chunkRemainder = ''
     let assistantResponse = ''
     let generatedTitle = null
+    const collectedSources = []
+    const seenSourceUrls = new Set()
+    const addSource = (source) => {
+        if (!source?.url || seenSourceUrls.has(source.url)) return
+        seenSourceUrls.add(source.url)
+        collectedSources.push(source)
+        if (onSourcesUpdate) {
+            onSourcesUpdate([...collectedSources])
+        }
+    }
     const processStreamEvent = (event) => {
         if (event.type === 'delta') {
             assistantResponse += event.delta || ''
@@ -106,14 +121,31 @@ const sendMessage = async (
             onReasoningDelta(event.delta || '')
         }
 
+        if (event.type === 'status' && onStatusUpdate) {
+            onStatusUpdate({
+                state: event.state || 'thinking',
+                message: event.message || ''
+            })
+        }
+
+        if (event.type === 'source' && event.source) {
+            addSource(event.source)
+        }
+
         if (event.type === 'done') {
             generatedTitle = event.title || null
             assistantResponse = event.assistantResponse || assistantResponse
+            if (Array.isArray(event.sources)) {
+                event.sources.forEach(addSource)
+            }
             if (onAssistantDelta) {
                 onAssistantDelta(assistantResponse)
             }
             if (onReasoningDelta) {
                 onReasoningDelta('')
+            }
+            if (onStatusUpdate) {
+                onStatusUpdate({ state: 'done', message: '' })
             }
         }
     }
@@ -140,7 +172,12 @@ const sendMessage = async (
         throw new Error('No response received from OpenAI')
     }
 
-    const assistantMessage = { id: Date.now() + 1, role: 'system', content: assistantResponse }
+    const assistantMessage = {
+        id: Date.now() + 1,
+        role: 'system',
+        content: assistantResponse,
+        sources: collectedSources
+    }
     const finalMessages = [...existingMessages, message, assistantMessage]
 
     if (!chatId) {
@@ -163,6 +200,48 @@ const sendMessage = async (
     return { chatId, finalMessages }
 }
 
+const fetchAvailableModels = async () => {
+    const user = auth.currentUser
+    if (!user) {
+        throw new Error('User not authenticated')
+    }
+    const idToken = await user.getIdToken()
+    let response
+    try {
+        response = await fetch(LIST_AVAILABLE_MODELS_HTTP_URL, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${idToken}`
+            },
+            body: JSON.stringify({})
+        })
+    } catch (error) {
+        throw new Error(
+            'Could not reach listAvailableModelsHttp. '
+            + 'Deploy latest functions, then reload settings.'
+        )
+    }
+
+    if (!response.ok) {
+        let errorMessage = 'Failed to fetch available models'
+        try {
+            const errorData = await response.json()
+            errorMessage = errorData.error || errorMessage
+        } catch (e) {
+            // Keep generic message if no JSON body is available.
+        }
+        throw new Error(errorMessage)
+    }
+
+    const payload = await response.json()
+    return {
+        models: Array.isArray(payload.models) ? payload.models : [],
+        defaultModel: payload.defaultModel || 'gpt-5'
+    }
+}
+
 export default {
-    sendMessage
+    sendMessage,
+    fetchAvailableModels
 }

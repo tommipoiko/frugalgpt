@@ -3,7 +3,7 @@ import {
     Route, Routes, useNavigate, useLocation
 } from 'react-router-dom'
 import {
-    styled, useTheme, ThemeProvider, createTheme
+    styled, ThemeProvider
 } from '@mui/material/styles'
 import {
     AppBar as MuiAppBar,
@@ -14,15 +14,17 @@ import {
     Toolbar,
     Menu,
     MenuItem,
-    Button
+    Button,
+    Tooltip,
+    Avatar,
+    Divider
 } from '@mui/material'
 import MenuIcon from '@mui/icons-material/Menu'
-import ChevronLeftIcon from '@mui/icons-material/ChevronLeft'
-import ChevronRightIcon from '@mui/icons-material/ChevronRight'
-import AccountCircle from '@mui/icons-material/AccountCircle'
-import SettingsIcon from '@mui/icons-material/Settings'
+import MenuOpenIcon from '@mui/icons-material/MenuOpen'
+import SettingsOutlinedIcon from '@mui/icons-material/SettingsOutlined'
 import LoginIcon from '@mui/icons-material/Login'
-import LogoutIcon from '@mui/icons-material/Logout'
+import LogoutOutlinedIcon from '@mui/icons-material/LogoutOutlined'
+import AddRoundedIcon from '@mui/icons-material/AddRounded'
 import useMediaQuery from '@mui/material/useMediaQuery'
 import { onAuthStateChanged } from 'firebase/auth'
 import Signin from './components/Signin'
@@ -30,14 +32,16 @@ import User from './components/User'
 import Signup from './components/Signup'
 import Sidenav from './components/Sidenav'
 import Chat from './components/Chat/Chat'
+import BrandMark from './components/Brand/BrandMark'
 import { auth } from './services/firebase'
+import { buildAppTheme, brandGradient } from './theme'
 
-const drawerWidth = 300
+const drawerWidth = 280
 
 const Main = styled('main', { shouldForwardProp: (prop) => prop !== 'open' })(
     ({ theme, open }) => ({
         flexGrow: 1,
-        padding: theme.spacing(3),
+        padding: 0,
         transition: theme.transitions.create('margin', {
             easing: theme.transitions.easing.sharp,
             duration: theme.transitions.duration.leavingScreen
@@ -51,8 +55,7 @@ const Main = styled('main', { shouldForwardProp: (prop) => prop !== 'open' })(
             marginLeft: 0
         }),
         [theme.breakpoints.down('sm')]: {
-            marginLeft: 0,
-            padding: theme.spacing(2)
+            marginLeft: 0
         }
     })
 )
@@ -74,27 +77,24 @@ const AppBar = styled(MuiAppBar, {
     })
 }))
 
-const DrawerHeader = styled('div')(({ theme }) => ({
-    display: 'flex',
-    alignItems: 'center',
-    padding: theme.spacing(0, 1),
-    ...theme.mixins.toolbar,
-    justifyContent: 'flex-end'
+const TopbarSpacer = styled('div')(({ theme }) => ({
+    minHeight: 56,
+    [theme.breakpoints.up('sm')]: {
+        minHeight: 64
+    }
 }))
 
 function App() {
-    const theme = useTheme()
     const [user, setUser] = useState(
         () => JSON.parse(localStorage.getItem('frugalGptUser')) || null
     )
     const [anchorEl, setAnchorEl] = useState(null)
-    const [open, setOpen] = useState(() => localStorage.getItem('frugalGptSidenav') === 'true')
+    const [open, setOpen] = useState(() => localStorage.getItem('frugalGptSidenav') !== 'false')
     const [mode, setMode] = useState(() => localStorage.getItem('frugalGptTheme') || 'system')
     const [currentChat, setCurrentChat] = useState(null)
     const navigate = useNavigate()
     const location = useLocation()
     const prefersDarkMode = useMediaQuery('(prefers-color-scheme: dark)')
-    const isMobile = useMediaQuery(theme.breakpoints.down('sm'))
 
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
@@ -109,13 +109,16 @@ function App() {
         })
 
         return () => unsubscribe()
-    }, [auth, location, navigate])
+    }, [location, navigate])
 
     const getThemeMode = () => {
         if (mode === 'dark') return 'dark'
         if (mode === 'light') return 'light'
         return prefersDarkMode ? 'dark' : 'light'
     }
+
+    const themeConfig = buildAppTheme(getThemeMode())
+    const isMobile = useMediaQuery(themeConfig.breakpoints.down('sm'))
 
     const handleUserClick = (event) => {
         setAnchorEl(event.currentTarget)
@@ -138,22 +141,25 @@ function App() {
         navigate('/signin')
     }
 
-    const toggleDrawerOpen = () => {
-        setOpen(true)
-        localStorage.setItem('frugalGptSidenav', 'true')
+    const toggleDrawer = () => {
+        setOpen((prev) => {
+            const next = !prev
+            localStorage.setItem('frugalGptSidenav', String(next))
+            return next
+        })
     }
 
-    const toggleDrawerClose = () => {
-        setOpen(false)
-        localStorage.setItem('frugalGptSidenav', 'false')
+    const closeDrawerOnMobile = () => {
+        if (isMobile) {
+            setOpen(false)
+            localStorage.setItem('frugalGptSidenav', 'false')
+        }
     }
 
     const handleNewChat = () => {
         setCurrentChat(null)
         navigate('/')
-        if (isMobile) {
-            toggleDrawerClose()
-        }
+        closeDrawerOnMobile()
     }
 
     const handleNavigateChat = (id) => {
@@ -163,88 +169,103 @@ function App() {
         }
         setCurrentChat(id)
         navigate(`/chats/${id}`)
-        if (isMobile) {
-            toggleDrawerClose()
-        }
+        closeDrawerOnMobile()
     }
 
-    const themeConfig = createTheme({
-        palette: {
-            mode: getThemeMode()
-        }
-    })
+    const userInitial = (user?.email || user?.displayName || '?')
+        .trim()
+        .charAt(0)
+        .toUpperCase()
 
     return (
         <ThemeProvider theme={themeConfig}>
             <CssBaseline enableColorScheme />
-            <Box sx={{ display: 'flex' }}>
-                <AppBar position="fixed" open={open}>
-                    <Toolbar>
-                        <IconButton
-                            color="inherit"
-                            aria-label="open drawer"
-                            onClick={toggleDrawerOpen}
-                            edge="start"
-                            sx={{ mr: 2, ...(open && { display: 'none' }) }}
+            <Box sx={{ display: 'flex', minHeight: '100vh' }}>
+                <AppBar position="fixed" open={open && !isMobile}>
+                    <Toolbar sx={{ gap: 1 }}>
+                        <Tooltip title={open ? 'Hide sidebar' : 'Show sidebar'}>
+                            <IconButton
+                                color="inherit"
+                                aria-label="toggle drawer"
+                                onClick={toggleDrawer}
+                                edge="start"
+                            >
+                                {open ? <MenuOpenIcon /> : <MenuIcon />}
+                            </IconButton>
+                        </Tooltip>
+                        <Box
+                            sx={{
+                                display: { xs: 'flex', sm: open ? 'none' : 'flex' },
+                                alignItems: 'center'
+                            }}
                         >
-                            <MenuIcon />
-                        </IconButton>
+                            <BrandMark size={26} />
+                        </Box>
                         <Box sx={{ flexGrow: 1 }} />
-                        <Button
-                            color="inherit"
-                            onClick={handleNewChat}
-                            sx={{ marginRight: 2 }}
-                        >
-                            Home
-                        </Button>
+                        <Tooltip title="New chat">
+                            <IconButton
+                                color="inherit"
+                                aria-label="new chat"
+                                onClick={handleNewChat}
+                            >
+                                <AddRoundedIcon />
+                            </IconButton>
+                        </Tooltip>
                         {user ? (
-                            <div>
+                            <>
                                 <IconButton
-                                    size="large"
-                                    edge="end"
                                     aria-label="account of current user"
                                     aria-controls="menu-appbar"
                                     aria-haspopup="true"
                                     onClick={handleUserClick}
                                     color="inherit"
+                                    sx={{ ml: 0.5 }}
                                 >
-                                    <AccountCircle />
+                                    <Avatar
+                                        sx={{
+                                            width: 30,
+                                            height: 30,
+                                            fontSize: '0.85rem',
+                                            fontWeight: 600,
+                                            color: 'common.white',
+                                            backgroundImage: brandGradient
+                                        }}
+                                    >
+                                        {userInitial}
+                                    </Avatar>
                                 </IconButton>
                                 <Menu
                                     id="menu-appbar"
                                     anchorEl={anchorEl}
-                                    anchorOrigin={{
-                                        vertical: 'bottom',
-                                        horizontal: 'right'
-                                    }}
+                                    anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
                                     keepMounted
-                                    transformOrigin={{
-                                        vertical: 'top',
-                                        horizontal: 'right'
-                                    }}
+                                    transformOrigin={{ vertical: 'top', horizontal: 'right' }}
                                     open={Boolean(anchorEl)}
                                     onClose={handleMenuClose}
-                                    PaperProps={{
-                                        style: {
-                                            padding: '4px 0',
-                                            borderRadius: '8px',
-                                            boxShadow: '0px 4px 12px rgba(0, 0, 0, 0.1)'
-                                        }
-                                    }}
                                 >
-                                    <MenuItem onClick={handleSettings}>
-                                        <SettingsIcon fontSize="small" sx={{ marginRight: 1 }} />
+                                    <MenuItem
+                                        onClick={handleSettings}
+                                        sx={{ minWidth: 180, gap: 1.25 }}
+                                    >
+                                        <SettingsOutlinedIcon fontSize="small" />
                                         Settings
                                     </MenuItem>
-                                    <MenuItem onClick={handleSignOut}>
-                                        <LogoutIcon fontSize="small" sx={{ marginRight: 1 }} />
+                                    <Divider sx={{ my: 0.5 }} />
+                                    <MenuItem
+                                        onClick={handleSignOut}
+                                        sx={{ minWidth: 180, gap: 1.25 }}
+                                    >
+                                        <LogoutOutlinedIcon fontSize="small" />
                                         Sign out
                                     </MenuItem>
                                 </Menu>
-                            </div>
+                            </>
                         ) : (
-                            <Button color="inherit" href="/signin">
-                                <LoginIcon sx={{ marginRight: 1 }} />
+                            <Button
+                                variant="contained"
+                                startIcon={<LoginIcon />}
+                                onClick={() => navigate('/signin')}
+                            >
                                 Sign in
                             </Button>
                         )}
@@ -257,23 +278,42 @@ function App() {
                         '& .MuiDrawer-paper': {
                             width: drawerWidth,
                             boxSizing: 'border-box',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            overflow: 'hidden',
                             ...(isMobile && { width: '100vw', height: '100vh' })
                         }
                     }}
                     variant={isMobile ? 'temporary' : 'persistent'}
                     anchor="left"
                     open={open}
-                    onClose={toggleDrawerClose}
+                    onClose={() => setOpen(false)}
                 >
-                    <DrawerHeader>
-                        <IconButton onClick={toggleDrawerClose}>
-                            {theme.direction === 'ltr' ? <ChevronLeftIcon /> : <ChevronRightIcon />}
-                        </IconButton>
-                    </DrawerHeader>
-                    <Sidenav user={user} onNavigateChat={handleNavigateChat} />
+                    <Box
+                        sx={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            px: 2,
+                            py: 1.5,
+                            minHeight: 64
+                        }}
+                    >
+                        <BrandMark size={26} />
+                        <Tooltip title="Hide sidebar">
+                            <IconButton onClick={toggleDrawer} size="small">
+                                <MenuOpenIcon fontSize="small" />
+                            </IconButton>
+                        </Tooltip>
+                    </Box>
+                    <Sidenav
+                        user={user}
+                        onNavigateChat={handleNavigateChat}
+                        currentChatId={currentChat}
+                    />
                 </Drawer>
-                <Main open={open}>
-                    <DrawerHeader />
+                <Main open={open && !isMobile}>
+                    <TopbarSpacer />
                     <Routes>
                         <Route path="/" element={<Chat currentChat={currentChat} />} />
                         <Route path="/signin" element={<Signin />} />
