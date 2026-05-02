@@ -87,21 +87,30 @@ const buildComponents = (mode) => ({
                 boxSizing: 'border-box'
             },
             html: {
-                height: '100%',
-                overflow: 'hidden',
-                overscrollBehavior: 'none'
-            },
-            body: {
-                margin: 0,
+                position: 'fixed',
+                width: '100%',
                 height: '100%',
                 overflow: 'hidden',
                 overscrollBehavior: 'none',
+                touchAction: 'manipulation'
+            },
+            body: {
+                margin: 0,
+                position: 'fixed',
+                width: '100%',
+                height: '100%',
+                overflow: 'hidden',
+                overscrollBehavior: 'none',
+                touchAction: 'manipulation',
                 fontFeatureSettings: '"cv02", "cv03", "cv04", "cv11"',
                 WebkitFontSmoothing: 'antialiased'
             },
             '#root': {
+                position: 'fixed',
+                inset: 0,
+                width: '100%',
                 height: '100%',
-                minHeight: '-webkit-fill-available',
+                maxHeight: '100%',
                 display: 'flex',
                 flexDirection: 'column',
                 overflow: 'hidden',

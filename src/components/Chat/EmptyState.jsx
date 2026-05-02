@@ -13,7 +13,7 @@ function EmptyState() {
                 flexDirection: 'column',
                 alignItems: 'center',
                 justifyContent: 'center',
-                minHeight: '60vh',
+                py: { xs: 6, sm: 8 },
                 px: 2,
                 gap: 4,
                 width: '100%'

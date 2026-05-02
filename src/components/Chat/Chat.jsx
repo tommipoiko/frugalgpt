@@ -29,7 +29,9 @@ const chatComposerMaxSx = {
     maxWidth: { xs: 'min(100%, 400px)', sm: 760 },
     minWidth: 0,
     mx: { xs: 'auto', sm: 0 },
-    boxSizing: 'border-box'
+    boxSizing: 'border-box',
+    // Keeps disclaimer + input fully above the home indicator / rounded corners
+    pb: 'calc(16px + env(safe-area-inset-bottom, 0px))'
 }
 
 function Chat({ currentChat }) {
@@ -291,8 +293,8 @@ function Chat({ currentChat }) {
                     backgroundImage: theme.palette.mode === 'dark'
                         ? 'linear-gradient(to top, rgba(11,11,15,1) 60%, rgba(11,11,15,0))'
                         : 'linear-gradient(to top, rgba(247,247,248,1) 60%, rgba(247,247,248,0))',
-                    pt: 2,
-                    pb: 'max(12px, env(safe-area-inset-bottom, 0px))',
+                    pt: { xs: 1.5, sm: 2 },
+                    pb: 0,
                     display: 'flex',
                     flexDirection: 'column',
                     alignItems: 'center',
@@ -435,7 +437,12 @@ function Chat({ currentChat }) {
                         variant="caption"
                         color="text.secondary"
                         align="center"
-                        sx={{ display: 'block', mt: 1 }}
+                        sx={{
+                            display: 'block',
+                            mt: 0.75,
+                            px: 0.5,
+                            lineHeight: 1.35
+                        }}
                     >
                         FrugalGPT can make mistakes. Verify important info.
                     </Typography>
