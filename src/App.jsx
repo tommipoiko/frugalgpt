@@ -41,7 +41,20 @@ const drawerWidth = 280
 const Main = styled('main', { shouldForwardProp: (prop) => prop !== 'open' })(
     ({ theme, open }) => ({
         flexGrow: 1,
+        flexShrink: 1,
+        minWidth: 0,
+        minHeight: 0,
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'hidden',
         padding: 0,
+        paddingLeft: `max(${theme.spacing(3)}, env(safe-area-inset-left, 0px))`,
+        paddingRight: `max(${theme.spacing(3)}, env(safe-area-inset-right, 0px))`,
+        boxSizing: 'border-box',
+        [theme.breakpoints.down('sm')]: {
+            paddingLeft: `max(${theme.spacing(4)}, env(safe-area-inset-left, 0px))`,
+            paddingRight: `max(${theme.spacing(4)}, env(safe-area-inset-right, 0px))`
+        },
         transition: theme.transitions.create('margin', {
             easing: theme.transitions.easing.sharp,
             duration: theme.transitions.duration.leavingScreen
@@ -63,6 +76,7 @@ const Main = styled('main', { shouldForwardProp: (prop) => prop !== 'open' })(
 const AppBar = styled(MuiAppBar, {
     shouldForwardProp: (prop) => prop !== 'open'
 })(({ theme, open }) => ({
+    paddingTop: 'env(safe-area-inset-top, 0px)',
     transition: theme.transitions.create(['margin', 'width'], {
         easing: theme.transitions.easing.sharp,
         duration: theme.transitions.duration.leavingScreen
@@ -78,9 +92,9 @@ const AppBar = styled(MuiAppBar, {
 }))
 
 const TopbarSpacer = styled('div')(({ theme }) => ({
-    minHeight: 56,
+    minHeight: 'calc(56px + env(safe-area-inset-top, 0px))',
     [theme.breakpoints.up('sm')]: {
-        minHeight: 64
+        minHeight: 'calc(64px + env(safe-area-inset-top, 0px))'
     }
 }))
 
@@ -180,9 +194,32 @@ function App() {
     return (
         <ThemeProvider theme={themeConfig}>
             <CssBaseline enableColorScheme />
-            <Box sx={{ display: 'flex', minHeight: '100vh' }}>
+            <Box
+                sx={{
+                    flex: 1,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    minHeight: 0,
+                    height: '100%',
+                    width: '100%',
+                    maxWidth: '100%',
+                    overflow: 'hidden'
+                }}
+            >
                 <AppBar position="fixed" open={open && !isMobile}>
-                    <Toolbar sx={{ gap: 1 }}>
+                    <Toolbar
+                        sx={{
+                            gap: 1,
+                            pl: {
+                                xs: 'max(32px, env(safe-area-inset-left, 0px))',
+                                sm: 2
+                            },
+                            pr: {
+                                xs: 'max(32px, env(safe-area-inset-right, 0px))',
+                                sm: 3
+                            }
+                        }}
+                    >
                         <Tooltip title={open ? 'Hide sidebar' : 'Show sidebar'}>
                             <IconButton
                                 color="inherit"
@@ -271,57 +308,87 @@ function App() {
                         )}
                     </Toolbar>
                 </AppBar>
-                <Drawer
+                <Box
                     sx={{
-                        width: drawerWidth,
-                        flexShrink: 0,
-                        '& .MuiDrawer-paper': {
-                            width: drawerWidth,
-                            boxSizing: 'border-box',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            overflow: 'hidden',
-                            ...(isMobile && { width: '100vw', height: '100vh' })
-                        }
+                        display: 'flex',
+                        flex: 1,
+                        minHeight: 0,
+                        width: '100%',
+                        maxWidth: '100%',
+                        overflow: 'hidden'
                     }}
-                    variant={isMobile ? 'temporary' : 'persistent'}
-                    anchor="left"
-                    open={open}
-                    onClose={() => setOpen(false)}
                 >
-                    <Box
+                    <Drawer
                         sx={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                            px: 2,
-                            py: 1.5,
-                            minHeight: 64
+                            width: drawerWidth,
+                            flexShrink: 0,
+                            '& .MuiDrawer-paper': {
+                                width: drawerWidth,
+                                boxSizing: 'border-box',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                overflow: 'hidden',
+                                ...(isMobile && {
+                                    width: '100%',
+                                    maxWidth: '100%',
+                                    height: '100vh',
+                                    maxHeight: '100vh'
+                                })
+                            }
                         }}
+                        variant={isMobile ? 'temporary' : 'persistent'}
+                        anchor="left"
+                        open={open}
+                        onClose={() => setOpen(false)}
                     >
-                        <BrandMark size={26} />
-                        <Tooltip title="Hide sidebar">
-                            <IconButton onClick={toggleDrawer} size="small">
-                                <MenuOpenIcon fontSize="small" />
-                            </IconButton>
-                        </Tooltip>
-                    </Box>
-                    <Sidenav
-                        user={user}
-                        onNavigateChat={handleNavigateChat}
-                        currentChatId={currentChat}
-                    />
-                </Drawer>
-                <Main open={open && !isMobile}>
-                    <TopbarSpacer />
-                    <Routes>
-                        <Route path="/" element={<Chat currentChat={currentChat} />} />
-                        <Route path="/signin" element={<Signin />} />
-                        <Route path="/signup" element={<Signup />} />
-                        <Route path="/user" element={<User setMode={setMode} />} />
-                        <Route path="/chats/:id" element={<Chat currentChat={currentChat} />} />
-                    </Routes>
-                </Main>
+                        <Box
+                            sx={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                px: 2,
+                                py: 1.5,
+                                minHeight: 64
+                            }}
+                        >
+                            <BrandMark size={26} />
+                            <Tooltip title="Hide sidebar">
+                                <IconButton onClick={toggleDrawer} size="small">
+                                    <MenuOpenIcon fontSize="small" />
+                                </IconButton>
+                            </Tooltip>
+                        </Box>
+                        <Sidenav
+                            user={user}
+                            onNavigateChat={handleNavigateChat}
+                            currentChatId={currentChat}
+                        />
+                    </Drawer>
+                    <Main open={open && !isMobile}>
+                        <TopbarSpacer />
+                        <Box
+                            sx={{
+                                flex: 1,
+                                minHeight: 0,
+                                display: 'flex',
+                                flexDirection: 'column',
+                                overflow: 'hidden',
+                                width: '100%'
+                            }}
+                        >
+                            <Routes>
+                                <Route path="/" element={<Chat currentChat={currentChat} />} />
+                                <Route path="/signin" element={<Signin />} />
+                                <Route path="/signup" element={<Signup />} />
+                                <Route path="/user" element={<User setMode={setMode} />} />
+                                <Route
+                                    path="/chats/:id"
+                                    element={<Chat currentChat={currentChat} />}
+                                />
+                            </Routes>
+                        </Box>
+                    </Main>
+                </Box>
             </Box>
         </ThemeProvider>
     )

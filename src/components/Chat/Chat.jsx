@@ -15,6 +15,23 @@ import EmptyState from './EmptyState'
 import ThinkingIndicator from './ThinkingIndicator'
 import { brandGradient } from '../../theme'
 
+/** Shared width so messages and composer stay aligned (avoids scrollbar shifting one column). */
+const chatThreadMaxSx = {
+    width: '100%',
+    maxWidth: { xs: 'min(100%, 400px)', sm: 800 },
+    minWidth: 0,
+    mx: { xs: 'auto', sm: 0 },
+    boxSizing: 'border-box'
+}
+
+const chatComposerMaxSx = {
+    width: '100%',
+    maxWidth: { xs: 'min(100%, 400px)', sm: 760 },
+    minWidth: 0,
+    mx: { xs: 'auto', sm: 0 },
+    boxSizing: 'border-box'
+}
+
 function Chat({ currentChat }) {
     const [messages, setMessages] = useState([])
     const [currentMessage, setCurrentMessage] = useState('')
@@ -182,11 +199,6 @@ function Chat({ currentChat }) {
         }
     }
 
-    const handleSelectSuggestion = (suggestion) => {
-        setCurrentMessage(suggestion)
-        composerRef.current?.focus()
-    }
-
     const isEmpty = messages.length === 0 && !isSendingMessage
 
     return (
@@ -194,8 +206,13 @@ function Chat({ currentChat }) {
             sx={{
                 display: 'flex',
                 flexDirection: 'column',
-                height: 'calc(100vh - 64px)',
-                position: 'relative'
+                flex: 1,
+                minHeight: 0,
+                width: '100%',
+                maxWidth: '100%',
+                overflow: 'hidden',
+                position: 'relative',
+                boxSizing: 'border-box'
             }}
         >
             <Box
@@ -203,17 +220,21 @@ function Chat({ currentChat }) {
                 onScroll={handleScroll}
                 sx={{
                     flex: 1,
+                    minHeight: 0,
                     overflowY: 'auto',
                     overflowX: 'hidden',
+                    WebkitOverflowScrolling: 'touch',
+                    overscrollBehavior: 'contain',
+                    touchAction: 'pan-y',
                     display: 'flex',
-                    justifyContent: 'center'
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    scrollbarGutter: 'stable'
                 }}
             >
                 <Box
                     sx={{
-                        width: '100%',
-                        maxWidth: 800,
-                        px: { xs: 2, sm: 3 },
+                        ...chatThreadMaxSx,
                         pt: { xs: 2, sm: 3 },
                         pb: 2,
                         display: 'flex',
@@ -222,7 +243,7 @@ function Chat({ currentChat }) {
                     }}
                 >
                     {isEmpty && (
-                        <EmptyState onSelectSuggestion={handleSelectSuggestion} />
+                        <EmptyState />
                     )}
 
                     {!isEmpty && messages.map((message) => (
@@ -264,26 +285,21 @@ function Chat({ currentChat }) {
 
             <Box
                 sx={{
-                    position: 'sticky',
-                    bottom: 0,
+                    flexShrink: 0,
                     width: '100%',
+                    maxWidth: '100%',
                     backgroundImage: theme.palette.mode === 'dark'
                         ? 'linear-gradient(to top, rgba(11,11,15,1) 60%, rgba(11,11,15,0))'
                         : 'linear-gradient(to top, rgba(247,247,248,1) 60%, rgba(247,247,248,0))',
                     pt: 2,
-                    pb: 1.5,
+                    pb: 'max(12px, env(safe-area-inset-bottom, 0px))',
                     display: 'flex',
                     flexDirection: 'column',
-                    alignItems: 'center'
+                    alignItems: 'center',
+                    boxSizing: 'border-box'
                 }}
             >
-                <Box
-                    sx={{
-                        width: '100%',
-                        maxWidth: 760,
-                        px: { xs: 2, sm: 3 }
-                    }}
-                >
+                <Box sx={chatComposerMaxSx}>
                     {canSendMessages ? (
                         <Box
                             component="form"

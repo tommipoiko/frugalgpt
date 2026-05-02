@@ -61,7 +61,7 @@ function Sources({ sources }) {
                                 py: 0.75,
                                 textDecoration: 'none',
                                 color: 'inherit',
-                                maxWidth: 320,
+                                maxWidth: 'min(320px, 100%)',
                                 transition: 'all 120ms ease',
                                 '&:hover': {
                                     borderColor: 'primary.main',

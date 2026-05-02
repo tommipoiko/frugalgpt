@@ -84,6 +84,9 @@ function MessageBubble({ message }) {
                 sx={{
                     flex: 1,
                     minWidth: 0,
+                    maxWidth: '100%',
+                    overflowWrap: 'anywhere',
+                    wordBreak: 'break-word',
                     color: 'text.primary',
                     '& p': { margin: '0 0 0.75em' },
                     '& p:last-child': { marginBottom: 0 },
@@ -97,6 +100,8 @@ function MessageBubble({ message }) {
                     '& a': {
                         color: 'primary.main',
                         textDecoration: 'none',
+                        overflowWrap: 'anywhere',
+                        wordBreak: 'break-word',
                         borderBottom: (theme) => `1px solid ${theme.palette.primary.main}55`,
                         '&:hover': { borderBottomColor: 'primary.main' }
                     },

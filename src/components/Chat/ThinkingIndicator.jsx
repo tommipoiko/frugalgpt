@@ -62,7 +62,8 @@ function ThinkingIndicator({ text }) {
                         whiteSpace: 'nowrap',
                         overflow: 'hidden',
                         textOverflow: 'ellipsis',
-                        maxWidth: 480
+                        maxWidth: 'min(480px, 100%)',
+                        minWidth: 0
                     }}
                 >
                     {text}

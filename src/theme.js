@@ -86,9 +86,26 @@ const buildComponents = (mode) => ({
             '*, *::before, *::after': {
                 boxSizing: 'border-box'
             },
+            html: {
+                height: '100%',
+                overflow: 'hidden',
+                overscrollBehavior: 'none'
+            },
             body: {
+                margin: 0,
+                height: '100%',
+                overflow: 'hidden',
+                overscrollBehavior: 'none',
                 fontFeatureSettings: '"cv02", "cv03", "cv04", "cv11"',
                 WebkitFontSmoothing: 'antialiased'
+            },
+            '#root': {
+                height: '100%',
+                minHeight: '-webkit-fill-available',
+                display: 'flex',
+                flexDirection: 'column',
+                overflow: 'hidden',
+                maxWidth: '100%'
             },
             '@keyframes brandShimmer': {
                 '0%': { backgroundPosition: '0% 50%' },
@@ -108,7 +125,13 @@ const buildComponents = (mode) => ({
                 boxShadow: 'none',
                 borderBottom: mode === 'dark'
                     ? '1px solid rgba(255,255,255,0.06)'
-                    : '1px solid rgba(15,23,42,0.06)'
+                    : '1px solid rgba(15,23,42,0.06)',
+                // backdrop-filter can break position:fixed stickiness on mobile Safari
+                '@media (max-width: 599.95px)': {
+                    backdropFilter: 'none',
+                    WebkitBackdropFilter: 'none',
+                    backgroundColor: mode === 'dark' ? '#0B0B0F' : '#F7F7F8'
+                }
             }
         }
     },

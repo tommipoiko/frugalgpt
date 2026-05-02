@@ -49,8 +49,12 @@ function Signin() {
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                minHeight: 'calc(100vh - 64px)',
-                px: 2,
+                flex: 1,
+                minHeight: 0,
+                overflow: 'auto',
+                width: '100%',
+                maxWidth: '100%',
+                boxSizing: 'border-box',
                 py: 4
             }}
         >
