@@ -1,29 +1,13 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import {
-    List,
-    ListItem,
-    ListItemButton,
-    ListItemText,
-    IconButton,
-    Menu,
-    MenuItem,
-    Typography,
-    Dialog,
-    DialogActions,
-    DialogContent,
-    DialogContentText,
-    DialogTitle,
-    Button,
-    TextField,
-    Box,
-    Divider
-} from '@mui/material'
-import MoreVertIcon from '@mui/icons-material/MoreVert'
-import ShareOutlinedIcon from '@mui/icons-material/ShareOutlined'
-import EditOutlinedIcon from '@mui/icons-material/EditOutlined'
-import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline'
-import AddRoundedIcon from '@mui/icons-material/AddRounded'
-import ChatBubbleOutlineRoundedIcon from '@mui/icons-material/ChatBubbleOutlineRounded'
+    Plus,
+    MessageCircle,
+    MoreVertical,
+    Share2,
+    Pencil,
+    Trash2
+} from 'lucide-react'
+import clsx from 'clsx'
 import {
     collection, query, orderBy, onSnapshot, where, doc, updateDoc, deleteDoc
 } from 'firebase/firestore'
@@ -58,8 +42,9 @@ const groupChatsByRecency = (chats) => {
 
 function Sidenav({ user, onNavigateChat, currentChatId }) {
     const [chats, setChats] = useState([])
-    const [anchorEl, setAnchorEl] = useState(null)
     const [selectedChat, setSelectedChat] = useState(null)
+    const [menuOpen, setMenuOpen] = useState(false)
+    const [menuPos, setMenuPos] = useState({ top: 0, left: 0 })
     const [renameChatId, setRenameChatId] = useState(null)
     const [editedName, setEditedName] = useState('')
     const [deleteChatId, setDeleteChatId] = useState(null)
@@ -94,12 +79,14 @@ function Sidenav({ user, onNavigateChat, currentChatId }) {
     const handleMenuOpen = (event, chatId) => {
         event.preventDefault()
         event.stopPropagation()
-        setAnchorEl(event.currentTarget)
+        const r = event.currentTarget.getBoundingClientRect()
+        setMenuPos({ top: r.bottom + 8, left: r.left })
         setSelectedChat(chatId)
+        setMenuOpen(true)
     }
 
     const handleMenuClose = () => {
-        setAnchorEl(null)
+        setMenuOpen(false)
         setSelectedChat(null)
     }
 
@@ -173,250 +160,244 @@ function Sidenav({ user, onNavigateChat, currentChatId }) {
         setOpenShareDialog(false)
     }
 
+    const handleChatActivate = (chatId) => {
+        onNavigateChat(chatId)
+    }
+
     const renderChatRow = (chat) => {
         const isSelected = currentChatId === chat.id
         return (
-            <ListItem
-                key={chat.id}
-                disablePadding
-                sx={{ px: 1, mb: 0.25 }}
-                secondaryAction={(
-                    <IconButton
-                        edge="end"
-                        size="small"
-                        aria-label="options"
-                        onClick={(event) => handleMenuOpen(event, chat.id)}
-                        sx={{
-                            opacity: 0,
-                            transition: 'opacity 120ms ease',
-                            '.MuiListItem-root:hover &': { opacity: 1 },
-                            '&:focus-visible': { opacity: 1 }
+            <li key={chat.id} className="group relative mb-0.5 px-2">
+                <div className="relative flex items-center">
+                    <button
+                        type="button"
+                        onClick={() => handleChatActivate(chat.id)}
+                        onTouchEnd={(event) => {
+                            event.preventDefault()
+                            handleChatActivate(chat.id)
                         }}
+                        className={clsx(
+                            'flex flex-1 items-center gap-2 rounded-[10px] py-1.5 pl-2 pr-10 text-left text-sm',
+                            isSelected
+                                ? 'bg-emerald-500/[0.14] font-semibold dark:bg-emerald-400/[0.14]'
+                                : 'font-medium hover:bg-black/[0.04] dark:hover:bg-white/[0.06]'
+                        )}
                     >
-                        <MoreVertIcon fontSize="small" />
-                    </IconButton>
-                )}
-            >
-                <ListItemButton
-                    selected={isSelected}
-                    onClick={() => onNavigateChat(chat.id)}
-                    sx={{
-                        gap: 1,
-                        py: 0.75,
-                        pr: 4.5,
-                        '&.Mui-selected': {
-                            backgroundColor: 'action.selected'
-                        }
-                    }}
-                >
-                    <ChatBubbleOutlineRoundedIcon
-                        sx={{ fontSize: 16, color: 'text.secondary', flexShrink: 0 }}
-                    />
-                    <ListItemText
-                        primary={chat.name || 'Untitled chat'}
-                        primaryTypographyProps={{
-                            noWrap: true,
-                            title: chat.name,
-                            fontSize: '0.875rem',
-                            fontWeight: isSelected ? 600 : 500
-                        }}
-                    />
-                </ListItemButton>
-            </ListItem>
+                        <MessageCircle className="h-4 w-4 shrink-0 opacity-60" />
+                        <span className="truncate" title={chat.name}>
+                            {chat.name || 'Untitled chat'}
+                        </span>
+                    </button>
+                    <button
+                        type="button"
+                        aria-label="options"
+                        onClick={(e) => handleMenuOpen(e, chat.id)}
+                        className={clsx(
+                            'absolute right-1 top-1/2 -translate-y-1/2 rounded-lg p-1 text-zinc-500',
+                            'transition-opacity max-xs:opacity-100 max-xs:pointer-events-auto',
+                            'opacity-0 pointer-events-none xs:group-hover:opacity-100',
+                            'xs:group-hover:pointer-events-auto',
+                            'focus-visible:opacity-100 focus-visible:pointer-events-auto'
+                        )}
+                    >
+                        <MoreVertical className="h-4 w-4" />
+                    </button>
+                </div>
+            </li>
         )
     }
 
+    const modalBackdrop = 'fixed inset-0 z-[1400] flex items-center justify-center bg-black/50 p-4'
+
     return (
-        <Box
-            sx={{
-                display: 'flex',
-                flexDirection: 'column',
-                flex: 1,
-                minHeight: 0,
-                overflow: 'hidden'
-            }}
-        >
-            <Box sx={{ px: 2, pb: 1.5 }}>
-                <Button
-                    fullWidth
-                    variant="contained"
-                    startIcon={<AddRoundedIcon />}
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+            <div className="px-4 pb-3">
+                <button
+                    type="button"
                     onClick={() => onNavigateChat('new')}
-                    sx={{
-                        py: 1.1,
-                        backgroundImage: brandGradient,
-                        boxShadow: '0 6px 20px -8px rgba(16,185,129,0.5)'
-                    }}
+                    className={clsx(
+                        'flex w-full items-center justify-center gap-2 rounded-[10px] py-2.5',
+                        'text-sm font-semibold text-white shadow-[0_6px_20px_-8px_rgba(16,185,129,0.5)]'
+                    )}
+                    style={{ backgroundImage: brandGradient }}
                 >
+                    <Plus className="h-5 w-5" />
                     New chat
-                </Button>
-            </Box>
-            <Divider sx={{ mx: 2 }} />
-            <Box sx={{
-                flex: 1, minHeight: 0, overflowY: 'auto', pt: 1, pb: 2
-            }}
-            >
+                </button>
+            </div>
+            <div className="mx-4 h-px bg-slate-200/80 dark:bg-white/[0.06]" />
+            <div className="min-h-0 flex-1 overflow-y-auto pb-4 pt-2">
                 {chats.length === 0 ? (
-                    <Box sx={{ px: 2, py: 4, textAlign: 'center' }}>
-                        <Typography variant="body2" color="text.secondary">
-                            Your chats will appear here.
-                        </Typography>
-                    </Box>
+                    <div className="px-4 py-8 text-center text-sm text-slate-500 dark:text-zinc-400">
+                        Your chats will appear here.
+                    </div>
                 ) : (
                     grouped.map(([label, items]) => (
-                        <Box key={label} sx={{ mb: 1 }}>
-                            <Typography
-                                variant="overline"
-                                sx={{
-                                    display: 'block',
-                                    px: 3,
-                                    pt: 1.5,
-                                    pb: 0.5,
-                                    color: 'text.secondary',
-                                    fontWeight: 600,
-                                    letterSpacing: '0.06em'
-                                }}
-                            >
+                        <div key={label} className="mb-2">
+                            <span className="block px-4 pb-1 pt-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-zinc-500">
                                 {label}
-                            </Typography>
-                            <List disablePadding>
-                                {items.map(renderChatRow)}
-                            </List>
-                        </Box>
+                            </span>
+                            <ul>{items.map(renderChatRow)}</ul>
+                        </div>
                     ))
                 )}
-            </Box>
+            </div>
 
-            <Menu
-                anchorEl={anchorEl}
-                anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
-                keepMounted
-                transformOrigin={{ vertical: 'top', horizontal: 'left' }}
-                open={Boolean(anchorEl)}
-                onClose={handleMenuClose}
-            >
-                <MenuItem
-                    onClick={() => handleShareClick(selectedChat)}
-                    sx={{ minWidth: 160, gap: 1.25 }}
-                >
-                    <ShareOutlinedIcon fontSize="small" />
-                    Share
-                </MenuItem>
-                <MenuItem
-                    onClick={() => handleRenameClick(
-                        selectedChat,
-                        chats.find((chat) => chat.id === selectedChat)?.name || ''
-                    )}
-                    sx={{ minWidth: 160, gap: 1.25 }}
-                >
-                    <EditOutlinedIcon fontSize="small" />
-                    Rename
-                </MenuItem>
-                <Divider sx={{ my: 0.5 }} />
-                <MenuItem
-                    onClick={() => handleDeleteClick(
-                        selectedChat,
-                        chats.find((chat) => chat.id === selectedChat)?.name || ''
-                    )}
-                    sx={{ minWidth: 160, gap: 1.25, color: 'error.main' }}
-                >
-                    <DeleteOutlineIcon fontSize="small" />
-                    Delete
-                </MenuItem>
-            </Menu>
-
-            <Dialog
-                open={openShareDialog}
-                onClose={handleShareClose}
-                aria-labelledby="share-dialog-title"
-                PaperProps={{ sx: { maxWidth: '90%', minWidth: 380, borderRadius: 3 } }}
-            >
-                <DialogTitle id="share-dialog-title">Share chat</DialogTitle>
-                <DialogContent>
-                    <DialogContentText>
-                        Signed in users can read your chat history with this link:
-                    </DialogContentText>
-                    <Button
-                        fullWidth
-                        variant="outlined"
-                        sx={{
-                            mt: 2,
-                            justifyContent: 'flex-start',
-                            textTransform: 'none',
-                            whiteSpace: 'nowrap',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis'
-                        }}
-                        onClick={() => navigator.clipboard.writeText(shareChatLink)}
-                    >
-                        {shareChatLink}
-                    </Button>
-                </DialogContent>
-                <DialogActions>
-                    <Button onClick={handleShareClose} variant="contained">
-                        Close
-                    </Button>
-                </DialogActions>
-            </Dialog>
-
-            <Dialog
-                open={openRenameDialog}
-                onClose={handleRenameCancel}
-                aria-labelledby="rename-dialog-title"
-                PaperProps={{
-                    component: 'form',
-                    onSubmit: handleRenameSubmit,
-                    sx: { maxWidth: '90%', minWidth: 400, borderRadius: 3 }
-                }}
-            >
-                <DialogTitle id="rename-dialog-title">Rename chat</DialogTitle>
-                <DialogContent>
-                    <DialogContentText sx={{ mb: 2 }}>
-                        Enter a new name for the chat
-                    </DialogContentText>
-                    <TextField
-                        autoFocus
-                        required
-                        fullWidth
-                        value={editedName}
-                        onChange={(e) => setEditedName(e.target.value)}
+            {menuOpen && (
+                <>
+                    <button
+                        type="button"
+                        className="fixed inset-0 z-[1290]"
+                        aria-label="Close menu"
+                        onClick={handleMenuClose}
                     />
-                </DialogContent>
-                <DialogActions>
-                    <Button onClick={handleRenameCancel}>Cancel</Button>
-                    <Button type="submit" variant="contained">
-                        Rename
-                    </Button>
-                </DialogActions>
-            </Dialog>
-
-            <Dialog
-                open={openDeleteDialog}
-                onClose={handleDeleteCancel}
-                aria-labelledby="delete-dialog-title"
-                PaperProps={{ sx: { maxWidth: '90%', minWidth: 400, borderRadius: 3 } }}
-            >
-                <DialogTitle id="delete-dialog-title">Delete chat?</DialogTitle>
-                <DialogContent>
-                    <DialogContentText>
-                        This will permanently delete
-                        {' '}
-                        <strong>{deleteChatName || 'this chat'}</strong>
-                        .
-                    </DialogContentText>
-                </DialogContent>
-                <DialogActions>
-                    <Button onClick={handleDeleteCancel}>Cancel</Button>
-                    <Button
-                        onClick={handleDeleteConfirm}
-                        color="error"
-                        variant="contained"
+                    <div
+                        className="fixed z-[1300] min-w-[160px] rounded-xl border border-slate-200/80 bg-white py-1 shadow-lg dark:border-white/10 dark:bg-zinc-900"
+                        style={{
+                            top: menuPos.top,
+                            left: menuPos.left
+                        }}
                     >
-                        Delete
-                    </Button>
-                </DialogActions>
-            </Dialog>
-        </Box>
+                        <button
+                            type="button"
+                            className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-black/5 dark:hover:bg-white/10"
+                            onClick={() => handleShareClick(selectedChat)}
+                        >
+                            <Share2 className="h-4 w-4 opacity-70" />
+                            Share
+                        </button>
+                        <button
+                            type="button"
+                            className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-black/5 dark:hover:bg-white/10"
+                            onClick={() => handleRenameClick(
+                                selectedChat,
+                                chats.find((c) => c.id === selectedChat)?.name || ''
+                            )}
+                        >
+                            <Pencil className="h-4 w-4 opacity-70" />
+                            Rename
+                        </button>
+                        <div className="my-1 h-px bg-slate-200 dark:bg-white/10" />
+                        <button
+                            type="button"
+                            className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-red-600 hover:bg-red-500/10 dark:text-red-400"
+                            onClick={() => handleDeleteClick(
+                                selectedChat,
+                                chats.find((c) => c.id === selectedChat)?.name || ''
+                            )}
+                        >
+                            <Trash2 className="h-4 w-4 opacity-70" />
+                            Delete
+                        </button>
+                    </div>
+                </>
+            )}
+
+            {openShareDialog && (
+                <div className={modalBackdrop}>
+                    <div
+                        role="dialog"
+                        aria-labelledby="share-dialog-title"
+                        className="w-full max-w-md rounded-2xl border border-slate-200/80 bg-white p-6 shadow-xl dark:border-white/10 dark:bg-zinc-900"
+                    >
+                        <h2 id="share-dialog-title" className="text-lg font-semibold">
+                            Share chat
+                        </h2>
+                        <p className="mt-2 text-sm text-slate-600 dark:text-zinc-400">
+                            Signed in users can read your chat history with this link:
+                        </p>
+                        <button
+                            type="button"
+                            className="mt-4 flex w-full justify-start overflow-hidden text-ellipsis whitespace-nowrap rounded-xl border border-slate-200 px-3 py-2 text-left text-sm dark:border-white/10"
+                            onClick={() => navigator.clipboard.writeText(shareChatLink)}
+                        >
+                            {shareChatLink}
+                        </button>
+                        <button
+                            type="button"
+                            onClick={handleShareClose}
+                            className={clsx(
+                                'mt-4 w-full rounded-[10px] py-2.5 text-sm font-semibold text-white',
+                                'bg-gradient-to-br from-emerald-700 via-emerald-500 to-emerald-400'
+                            )}
+                        >
+                            Close
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {openRenameDialog && (
+                <div className={modalBackdrop}>
+                    <form
+                        onSubmit={handleRenameSubmit}
+                        className="w-full max-w-md rounded-2xl border border-slate-200/80 bg-white p-6 shadow-xl dark:border-white/10 dark:bg-zinc-900"
+                    >
+                        <h2 id="rename-dialog-title" className="text-lg font-semibold">
+                            Rename chat
+                        </h2>
+                        <p className="mt-2 text-sm text-slate-600 dark:text-zinc-400">
+                            Enter a new name for the chat
+                        </p>
+                        <input
+                            required
+                            autoFocus
+                            value={editedName}
+                            onChange={(e) => setEditedName(e.target.value)}
+                            className="mt-4 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm dark:border-white/10 dark:bg-zinc-800"
+                        />
+                        <div className="mt-4 flex justify-end gap-2">
+                            <button
+                                type="button"
+                                onClick={handleRenameCancel}
+                                className="rounded-[10px] px-4 py-2 text-sm font-medium text-slate-700 hover:bg-black/5 dark:text-zinc-300"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="submit"
+                                className="rounded-[10px] px-4 py-2 text-sm font-semibold text-white"
+                                style={{ backgroundImage: brandGradient }}
+                            >
+                                Rename
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            )}
+
+            {openDeleteDialog && (
+                <div className={modalBackdrop}>
+                    <div className="w-full max-w-md rounded-2xl border border-slate-200/80 bg-white p-6 shadow-xl dark:border-white/10 dark:bg-zinc-900">
+                        <h2 id="delete-dialog-title" className="text-lg font-semibold">
+                            Delete chat?
+                        </h2>
+                        <p className="mt-2 text-sm text-slate-600 dark:text-zinc-400">
+                            This will permanently delete
+                            {' '}
+                            <strong>{deleteChatName || 'this chat'}</strong>
+                            .
+                        </p>
+                        <div className="mt-6 flex justify-end gap-2">
+                            <button
+                                type="button"
+                                onClick={handleDeleteCancel}
+                                className="rounded-[10px] px-4 py-2 text-sm font-medium"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleDeleteConfirm}
+                                className="rounded-[10px] bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700"
+                            >
+                                Delete
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div>
     )
 }
 

@@ -1,75 +1,23 @@
 import React from 'react'
-import { Box, Typography } from '@mui/material'
-import AutoAwesomeRoundedIcon from '@mui/icons-material/AutoAwesomeRounded'
-import { brandShimmer } from '../../theme'
+import { Sparkles } from 'lucide-react'
 
 function ThinkingIndicator({ text }) {
     return (
-        <Box
-            sx={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 1.25,
-                px: 1.75,
-                py: 0.875,
-                borderRadius: 999,
-                background: (theme) => (theme.palette.mode === 'dark'
-                    ? 'rgba(52,211,153,0.10)'
-                    : 'rgba(16,185,129,0.08)'),
-                border: (theme) => (theme.palette.mode === 'dark'
-                    ? '1px solid rgba(52,211,153,0.25)'
-                    : '1px solid rgba(16,185,129,0.20)'),
-                maxWidth: '100%'
-            }}
+        <div
+            className="inline-flex max-w-full items-center gap-3 rounded-full border border-brand-500/20 bg-brand-500/10 px-4 py-2 dark:border-brand-400/25 dark:bg-brand-500/10"
         >
-            <Box
-                sx={{
-                    width: 18,
-                    height: 18,
-                    borderRadius: '50%',
-                    backgroundImage: brandShimmer,
-                    backgroundSize: '200% 200%',
-                    animation: 'brandShimmer 2.4s linear infinite',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: '#fff',
-                    flexShrink: 0
-                }}
-            >
-                <AutoAwesomeRoundedIcon sx={{ fontSize: 12 }} />
-            </Box>
-            <Typography
-                variant="body2"
-                sx={{
-                    fontWeight: 500,
-                    backgroundImage: brandShimmer,
-                    backgroundSize: '200% 200%',
-                    animation: 'brandShimmer 3s linear infinite',
-                    WebkitBackgroundClip: 'text',
-                    WebkitTextFillColor: 'transparent',
-                    backgroundClip: 'text'
-                }}
-            >
+            <div className="flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-brand-600 to-brand-400 text-white shadow-sm shadow-brand-500/30">
+                <Sparkles className="h-3 w-3" aria-hidden />
+            </div>
+            <span className="text-sm font-medium text-brand-700 dark:text-brand-300">
                 Thinking
-            </Typography>
+            </span>
             {text && (
-                <Typography
-                    variant="body2"
-                    color="text.secondary"
-                    sx={{
-                        fontStyle: 'italic',
-                        whiteSpace: 'nowrap',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        maxWidth: 'min(480px, 100%)',
-                        minWidth: 0
-                    }}
-                >
+                <span className="max-w-[min(480px,100%)] truncate text-sm italic text-slate-600 dark:text-zinc-400">
                     {text}
-                </Typography>
+                </span>
             )}
-        </Box>
+        </div>
     )
 }
 

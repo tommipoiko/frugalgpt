@@ -1,8 +1,5 @@
-import React from 'react'
-import {
-    Box, Typography, Stack, Paper
-} from '@mui/material'
-import LinkRoundedIcon from '@mui/icons-material/LinkRounded'
+import React, { useState } from 'react'
+import { Link2, ArrowLeft } from 'lucide-react'
 
 const getDomain = (url) => {
     try {
@@ -21,114 +18,85 @@ const getFaviconUrl = (url) => {
     }
 }
 
+function SourceChips({ sources }) {
+    return (
+        <div className="flex flex-row flex-wrap gap-2">
+            {sources.map((source, index) => {
+                const domain = getDomain(source.url)
+                const favicon = getFaviconUrl(source.url)
+                return (
+                    <a
+                        // eslint-disable-next-line react/no-array-index-key
+                        key={`${source.url}-${index}`}
+                        href={source.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex max-w-[min(320px,100%)] items-center gap-2 rounded-xl border border-slate-200/90 px-3 py-2 text-inherit no-underline transition hover:border-brand-500 dark:border-white/[0.08]"
+                    >
+                        <span className="flex h-[22px] w-[22px] shrink-0 items-center justify-center overflow-hidden rounded-md bg-slate-100 dark:bg-white/[0.06]">
+                            {favicon ? (
+                                <img src={favicon} alt="" className="h-4 w-4" />
+                            ) : (
+                                <Link2 className="h-3.5 w-3.5 text-slate-500" />
+                            )}
+                        </span>
+                        <span className="min-w-0 leading-tight">
+                            <span
+                                className="block truncate text-xs font-semibold text-slate-900 dark:text-zinc-100"
+                                title={source.title || domain}
+                            >
+                                {source.title || domain}
+                            </span>
+                            <span
+                                className="block truncate text-[0.7rem] text-slate-500 dark:text-zinc-400"
+                            >
+                                {domain}
+                            </span>
+                        </span>
+                    </a>
+                )
+            })}
+        </div>
+    )
+}
+
 function Sources({ sources }) {
+    const [expanded, setExpanded] = useState(false)
+
     if (!sources || sources.length === 0) return null
 
     return (
-        <Box sx={{ mt: 2 }}>
-            <Stack direction="row" alignItems="center" spacing={0.75} sx={{ mb: 1 }}>
-                <LinkRoundedIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
-                <Typography
-                    variant="caption"
-                    sx={{
-                        color: 'text.secondary',
-                        fontWeight: 600,
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.06em'
-                    }}
+        <div className="mt-4">
+            {!expanded ? (
+                <button
+                    type="button"
+                    onClick={() => setExpanded(true)}
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200/90 px-3 py-1.5 text-sm font-semibold text-slate-800 transition hover:border-brand-500 dark:border-white/[0.12] dark:text-zinc-100"
                 >
-                    Sources
-                </Typography>
-            </Stack>
-            <Stack direction="row" flexWrap="wrap" gap={1}>
-                {sources.map((source, index) => {
-                    const domain = getDomain(source.url)
-                    const favicon = getFaviconUrl(source.url)
-                    return (
-                        <Paper
-                            // eslint-disable-next-line react/no-array-index-key
-                            key={`${source.url}-${index}`}
-                            component="a"
-                            href={source.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            variant="outlined"
-                            sx={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: 1,
-                                px: 1.25,
-                                py: 0.75,
-                                textDecoration: 'none',
-                                color: 'inherit',
-                                maxWidth: 'min(320px, 100%)',
-                                transition: 'all 120ms ease',
-                                '&:hover': {
-                                    borderColor: 'primary.main',
-                                    transform: 'translateY(-1px)'
-                                }
-                            }}
+                    <Link2 className="h-4 w-4" aria-hidden />
+                    {`Sources (${sources.length})`}
+                </button>
+            ) : (
+                <div className="rounded-xl border border-slate-200/90 bg-white p-4 dark:border-white/[0.08] dark:bg-zinc-900/80">
+                    <div className="mb-3 flex items-center justify-between gap-2">
+                        <button
+                            type="button"
+                            onClick={() => setExpanded(false)}
+                            className="inline-flex items-center gap-1 text-sm font-semibold text-slate-700 dark:text-zinc-300"
                         >
-                            <Box
-                                sx={{
-                                    width: 22,
-                                    height: 22,
-                                    borderRadius: '6px',
-                                    overflow: 'hidden',
-                                    background: (theme) => (theme.palette.mode === 'dark'
-                                        ? 'rgba(255,255,255,0.06)'
-                                        : 'rgba(15,23,42,0.06)'),
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    flexShrink: 0
-                                }}
-                            >
-                                {favicon ? (
-                                    <Box
-                                        component="img"
-                                        src={favicon}
-                                        alt=""
-                                        sx={{ width: 16, height: 16 }}
-                                    />
-                                ) : (
-                                    <LinkRoundedIcon sx={{ fontSize: 14 }} />
-                                )}
-                            </Box>
-                            <Box sx={{ minWidth: 0, lineHeight: 1.2 }}>
-                                <Typography
-                                    variant="caption"
-                                    sx={{
-                                        display: 'block',
-                                        fontWeight: 600,
-                                        color: 'text.primary',
-                                        whiteSpace: 'nowrap',
-                                        overflow: 'hidden',
-                                        textOverflow: 'ellipsis'
-                                    }}
-                                    title={source.title || domain}
-                                >
-                                    {source.title || domain}
-                                </Typography>
-                                <Typography
-                                    variant="caption"
-                                    sx={{
-                                        display: 'block',
-                                        color: 'text.secondary',
-                                        whiteSpace: 'nowrap',
-                                        overflow: 'hidden',
-                                        textOverflow: 'ellipsis',
-                                        fontSize: '0.7rem'
-                                    }}
-                                >
-                                    {domain}
-                                </Typography>
-                            </Box>
-                        </Paper>
-                    )
-                })}
-            </Stack>
-        </Box>
+                            <ArrowLeft className="h-4 w-4" aria-hidden />
+                            Back to chat
+                        </button>
+                        <span className="shrink-0 text-xs font-semibold text-slate-500 dark:text-zinc-500">
+                            {sources.length}
+                            {' '}
+                            sources
+                        </span>
+                    </div>
+                    <SourceChips sources={sources} />
+                </div>
+            )}
+        </div>
     )
 }
 

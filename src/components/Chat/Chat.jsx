@@ -1,37 +1,55 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React, {
+    useEffect, useMemo, useRef, useState
+} from 'react'
 import {
-    Box, IconButton, TextareaAutosize, Typography, Tooltip
-} from '@mui/material'
-import AttachFileRoundedIcon from '@mui/icons-material/AttachFileRounded'
-import ArrowUpwardRoundedIcon from '@mui/icons-material/ArrowUpwardRounded'
-import StopRoundedIcon from '@mui/icons-material/StopRounded'
+    Paperclip, ArrowUp, Square, ChevronDown, X
+} from 'lucide-react'
+import clsx from 'clsx'
 import { useParams, useNavigate } from 'react-router-dom'
-import { useTheme } from '@mui/material/styles'
-import { doc, onSnapshot, getDoc } from 'firebase/firestore'
+import { doc, onSnapshot } from 'firebase/firestore'
 import { db, auth } from '../../services/firebase'
 import chatApi from '../../services/chatApi'
 import MessageBubble from './MessageBubble/MessageBubble'
 import EmptyState from './EmptyState'
 import ThinkingIndicator from './ThinkingIndicator'
-import { brandGradient } from '../../theme'
+import ModelSettingsSheet from './ModelSettingsSheet'
+import ProviderLogo from '../Brand/ProviderLogo'
+import useKeyboardOverlapBottom from '../../hooks/useKeyboardOverlapBottom'
+import useIsMobile from '../../hooks/useIsMobile'
+import { summarizeAttachmentsForStore } from '../../utils/attachmentParts'
+import {
+    defaultModelKeyForUser,
+    getChatModelEntry,
+    listChatModelsForUser,
+    resolveModelKeyFromFirestore
+} from '../../constants/availableModels'
 
-/** Shared width so messages and composer stay aligned (avoids scrollbar shifting one column). */
-const chatThreadMaxSx = {
-    width: '100%',
-    maxWidth: { xs: 'min(100%, 400px)', sm: 800 },
-    minWidth: 0,
-    mx: { xs: 'auto', sm: 0 },
-    boxSizing: 'border-box'
+const MAX_ATTACHMENT_SLOTS = 5
+
+function hasProviderKey(data, pid) {
+    if (!data) return false
+    if (pid === 'openai') {
+        return !!(data.providers?.openai?.apiKey?.trim() || data.openAi?.openaiKey?.trim())
+    }
+    return !!data.providers?.[pid]?.apiKey?.trim()
 }
 
-const chatComposerMaxSx = {
-    width: '100%',
-    maxWidth: { xs: 'min(100%, 400px)', sm: 760 },
-    minWidth: 0,
-    mx: { xs: 'auto', sm: 0 },
-    boxSizing: 'border-box',
-    // Keeps disclaimer + input fully above the home indicator / rounded corners
-    pb: 'calc(16px + env(safe-area-inset-bottom, 0px))'
+function persistReasoningForDoc(entry, reasoningEnabled) {
+    if (entry.reasoningMode === 'toggle') return reasoningEnabled
+    if (entry.reasoningMode === 'fixed-on') return true
+    return false
+}
+
+function persistWebForDoc(entry, webSearchEnabled) {
+    return !!entry.webSearch && webSearchEnabled
+}
+
+function apiReasoningForRequest(entry, reasoningEnabled) {
+    return persistReasoningForDoc(entry, reasoningEnabled)
+}
+
+function apiWebForRequest(entry, webSearchEnabled) {
+    return persistWebForDoc(entry, webSearchEnabled)
 }
 
 function Chat({ currentChat }) {
@@ -44,62 +62,189 @@ function Chat({ currentChat }) {
     const [reasoningPreview, setReasoningPreview] = useState('')
     const [statusPreview, setStatusPreview] = useState('')
     const [chatName, setChatName] = useState('')
+    const [userSettings, setUserSettings] = useState(null)
+    const userSettingsRef = useRef(null)
+    const [selectedModelKey, setSelectedModelKey] = useState(() => {
+        try {
+            const raw = localStorage.getItem('frugalGptChatDefaults')
+            if (raw) {
+                const j = JSON.parse(raw)
+                if (typeof j.modelKey === 'string') return j.modelKey
+            }
+        } catch {
+            // ignore
+        }
+        return 'gpt-5.4'
+    })
+    const [reasoningEnabled, setReasoningEnabled] = useState(true)
+    const [webSearchEnabled, setWebSearchEnabled] = useState(true)
+    const [modelSheetOpen, setModelSheetOpen] = useState(false)
+    const [sheetDraftModelKey, setSheetDraftModelKey] = useState('gpt-5.4')
+    const [sheetDraftReasoning, setSheetDraftReasoning] = useState(true)
+    const [sheetDraftWeb, setSheetDraftWeb] = useState(true)
+
     const { id } = useParams()
     const navigate = useNavigate()
     const listRef = useRef(null)
     const composerRef = useRef(null)
+    const attachmentsRef = useRef([])
+    const fileInputRef = useRef(null)
+    const prevSheetOpen = useRef(false)
     const [autoScrollEnabled, setAutoScrollEnabled] = useState(true)
-    const theme = useTheme()
+    const keyboardInset = useKeyboardOverlapBottom()
+    const isMobileLayout = useIsMobile()
+    const isExistingChat = Boolean(id || currentChat)
+
+    userSettingsRef.current = userSettings
+    attachmentsRef.current = attachments
+
+    const modelsAllowed = useMemo(
+        () => listChatModelsForUser((pid) => hasProviderKey(userSettings, pid)),
+        [userSettings]
+    )
+
+    const selectedEntry = useMemo(() => getChatModelEntry(selectedModelKey), [selectedModelKey])
+    const { provider } = selectedEntry
+
+    useEffect(() => () => {
+        attachmentsRef.current.forEach((a) => {
+            if (a.previewUrl) URL.revokeObjectURL(a.previewUrl)
+        })
+    }, [])
 
     useEffect(() => {
         document.title = chatName || 'FrugalGPT'
     }, [chatName])
 
     useEffect(() => {
-        const checkApiKey = async (userId) => {
-            const userDocRef = doc(db, 'users', userId)
-            const userDocSnap = await getDoc(userDocRef)
-            if (userDocSnap.exists() && userDocSnap.data().openAi?.openaiKey) {
-                setCanSendMessages(true)
-            } else {
-                setCanSendMessages(false)
+        try {
+            const raw = localStorage.getItem('frugalGptChatDefaults')
+            if (raw) {
+                const j = JSON.parse(raw)
+                if (typeof j.reasoningEnabled === 'boolean') setReasoningEnabled(j.reasoningEnabled)
+                if (typeof j.webSearchEnabled === 'boolean') setWebSearchEnabled(j.webSearchEnabled)
+                if (typeof j.modelKey === 'string') setSelectedModelKey(j.modelKey)
             }
+        } catch {
+            // ignore
         }
+    }, [])
 
-        // eslint-disable-next-line consistent-return
-        const unsubscribeAuth = auth.onAuthStateChanged(async (user) => {
-            if (user && id) {
-                await checkApiKey(user.uid)
-                const chatDocRef = doc(db, 'chats', id)
-                const unsubscribeChat = onSnapshot(chatDocRef, (snapshot) => {
+    useEffect(() => {
+        localStorage.setItem('frugalGptChatDefaults', JSON.stringify({
+            modelKey: selectedModelKey,
+            reasoningEnabled,
+            webSearchEnabled
+        }))
+    }, [selectedModelKey, reasoningEnabled, webSearchEnabled])
+
+    useEffect(() => {
+        let unsubUser = () => {}
+        let unsubChat = () => {}
+        const unsubAuth = auth.onAuthStateChanged((user) => {
+            unsubUser()
+            unsubChat()
+            if (!user) {
+                setCanSendMessages(false)
+                setUserSettings(null)
+                setMessages([])
+                setChatName('')
+                return
+            }
+            unsubUser = onSnapshot(doc(db, 'users', user.uid), (snap) => {
+                const data = snap.exists() ? snap.data() : null
+                setUserSettings(data)
+                setCanSendMessages(hasProviderKey(data, 'openai')
+                    || hasProviderKey(data, 'anthropic')
+                    || hasProviderKey(data, 'google')
+                    || hasProviderKey(data, 'mistral'))
+            })
+            if (id) {
+                unsubChat = onSnapshot(doc(db, 'chats', id), (snapshot) => {
                     if (snapshot.exists()) {
-                        const chatData = snapshot.data()
-                        setMessages(chatData.messages || [])
-                        setChatName(chatData.name || '')
+                        const data = snapshot.data()
+                        setMessages(data.messages || [])
+                        setChatName(data.name || '')
+                        const us = userSettingsRef.current
+                        const allowed = listChatModelsForUser((pid) => hasProviderKey(us, pid))
+                        const resolved = resolveModelKeyFromFirestore({
+                            modelKey: data.modelKey,
+                            provider: data.provider,
+                            model: data.model
+                        })
+                        let nextKey = resolved
+                        if (!nextKey || !allowed.some((m) => m.key === nextKey)) {
+                            nextKey = defaultModelKeyForUser((pid) => hasProviderKey(us, pid))
+                        }
+                        setSelectedModelKey(nextKey)
+                        if (typeof data.reasoningEnabled === 'boolean') {
+                            setReasoningEnabled(data.reasoningEnabled)
+                        }
+                        if (typeof data.webSearchEnabled === 'boolean') {
+                            setWebSearchEnabled(data.webSearchEnabled)
+                        }
                     } else {
                         navigate('/')
                     }
                 })
-                return () => unsubscribeChat()
-            } if (user && !id) {
-                await checkApiKey(user.uid)
-                setMessages([])
-                setChatName('')
             } else {
-                setCanSendMessages(false)
                 setMessages([])
                 setChatName('')
             }
         })
-
-        return () => unsubscribeAuth()
+        return () => {
+            unsubAuth()
+            unsubUser()
+            unsubChat()
+        }
     }, [id, navigate])
+
+    useEffect(() => {
+        if (id || !userSettings?.chatDefaults) return
+        const d = userSettings.chatDefaults
+        const allowed = listChatModelsForUser((pid) => hasProviderKey(userSettings, pid))
+        if (typeof d.modelKey === 'string' && allowed.some((m) => m.key === d.modelKey)) {
+            setSelectedModelKey(d.modelKey)
+        } else if (typeof d.provider === 'string' && typeof d.model === 'string') {
+            const rk = resolveModelKeyFromFirestore({
+                modelKey: d.modelKey,
+                provider: d.provider,
+                model: d.model
+            })
+            if (rk && allowed.some((m) => m.key === rk)) setSelectedModelKey(rk)
+        }
+        if (typeof d.reasoningEnabled === 'boolean') {
+            setReasoningEnabled(d.reasoningEnabled)
+        }
+        if (typeof d.webSearchEnabled === 'boolean') {
+            setWebSearchEnabled(d.webSearchEnabled)
+        }
+    }, [id, userSettings])
+
+    useEffect(() => {
+        if (!userSettings) return
+        if (modelsAllowed.some((m) => m.key === selectedModelKey)) return
+        const fb = defaultModelKeyForUser((pid) => hasProviderKey(userSettings, pid))
+        setSelectedModelKey(fb)
+    }, [userSettings, modelsAllowed, selectedModelKey])
+
+    useEffect(() => {
+        if (modelSheetOpen && !prevSheetOpen.current) {
+            setSheetDraftModelKey(selectedModelKey)
+            setSheetDraftReasoning(reasoningEnabled)
+            setSheetDraftWeb(webSearchEnabled)
+        }
+        prevSheetOpen.current = modelSheetOpen
+    }, [modelSheetOpen, selectedModelKey, reasoningEnabled, webSearchEnabled])
 
     useEffect(() => {
         if (autoScrollEnabled && listRef.current) {
             listRef.current.scrollTop = listRef.current.scrollHeight
         }
     }, [messages, autoScrollEnabled])
+
+    const effectiveReasoningRequest = apiReasoningForRequest(selectedEntry, reasoningEnabled)
+    const effectiveWebRequest = apiWebForRequest(selectedEntry, webSearchEnabled)
 
     const handleScroll = () => {
         if (!listRef.current) return
@@ -108,28 +253,122 @@ function Chat({ currentChat }) {
         setAutoScrollEnabled(isAtBottom)
     }
 
+    const scrollToLatest = () => {
+        setAutoScrollEnabled(true)
+        requestAnimationFrame(() => {
+            if (listRef.current) {
+                listRef.current.scrollTop = listRef.current.scrollHeight
+            }
+        })
+    }
+
+    const commitInferenceSettings = async ({
+        modelKey: mk,
+        reasoningEnabled: nextR,
+        webSearchEnabled: nextW
+    }) => {
+        const e = getChatModelEntry(mk)
+        setSelectedModelKey(mk)
+        setReasoningEnabled(nextR)
+        setWebSearchEnabled(nextW)
+        const pr = persistReasoningForDoc(e, nextR)
+        const pw = persistWebForDoc(e, nextW)
+        localStorage.setItem('frugalGptChatDefaults', JSON.stringify({
+            modelKey: mk,
+            reasoningEnabled: nextR,
+            webSearchEnabled: nextW
+        }))
+        try {
+            await chatApi.saveUserChatDefaults({
+                modelKey: mk,
+                provider: e.provider,
+                model: e.apiModelId,
+                reasoningEnabled: pr,
+                webSearchEnabled: pw
+            })
+        } catch {
+            // non-blocking
+        }
+        const chatKey = id || currentChat
+        if (chatKey) {
+            try {
+                await chatApi.updateChatInferenceDoc(chatKey, {
+                    modelKey: mk,
+                    provider: e.provider,
+                    model: e.apiModelId,
+                    reasoningEnabled: pr,
+                    webSearchEnabled: pw
+                })
+            } catch {
+                // non-blocking
+            }
+        }
+    }
+
+    const handleSheetDraftModelKeyChange = (key) => {
+        setSheetDraftModelKey(key)
+        const e = getChatModelEntry(key)
+        if (e.reasoningMode === 'fixed-on') setSheetDraftReasoning(true)
+        else if (e.reasoningMode === 'none') setSheetDraftReasoning(false)
+        if (!e.webSearch) setSheetDraftWeb(false)
+    }
+
+    const handleSheetApply = () => {
+        if (isExistingChat) {
+            setModelSheetOpen(false)
+            return
+        }
+        commitInferenceSettings({
+            modelKey: sheetDraftModelKey,
+            reasoningEnabled: sheetDraftReasoning,
+            webSearchEnabled: sheetDraftWeb
+        })
+        setModelSheetOpen(false)
+    }
+
+    const removeAttachment = (attachmentId) => {
+        setAttachments((prev) => {
+            const item = prev.find((att) => att.id === attachmentId)
+            if (item?.previewUrl) URL.revokeObjectURL(item.previewUrl)
+            return prev.filter((att) => att.id !== attachmentId)
+        })
+    }
+
     const handleSendMessage = async () => {
-        if (currentMessage.trim() === '' || !canSendMessages || isSendingMessage) return
+        const trimmed = currentMessage.trim()
+        const fileSlots = attachments.map((a) => a.file)
+        if ((!trimmed && fileSlots.length === 0) || !canSendMessages || isSendingMessage) return
+        if (!hasProviderKey(userSettings, selectedEntry.provider)) return
+
+        const persistR = persistReasoningForDoc(selectedEntry, reasoningEnabled)
+        const persistW = persistWebForDoc(selectedEntry, webSearchEnabled)
 
         setSendError('')
         setReasoningPreview('')
         setStatusPreview('Preparing response...')
         setIsSendingMessage(true)
-        const preparedAttachments = attachments
+        const preparedAttachments = [...attachments]
         const outgoingMessage = currentMessage
+        const storedAttachments = summarizeAttachmentsForStore(fileSlots)
         const newMessage = {
             id: Date.now(),
-            content: outgoingMessage,
+            content: trimmed,
             role: 'user',
-            attachments: preparedAttachments
+            ...(storedAttachments.length ? { attachments: storedAttachments } : {})
         }
 
         const updatedMessages = [...messages, newMessage]
         setMessages(updatedMessages)
         setCurrentMessage('')
         setAttachments([])
-        // Keep the composer active so the user can continue typing immediately.
-        requestAnimationFrame(() => composerRef.current?.focus())
+        if (isMobileLayout) {
+            composerRef.current?.blur()
+            if (typeof document !== 'undefined' && document.activeElement instanceof HTMLElement) {
+                document.activeElement.blur()
+            }
+        } else {
+            requestAnimationFrame(() => composerRef.current?.focus())
+        }
         const streamingAssistantMessageId = Date.now() + 1
         setMessages([
             ...updatedMessages,
@@ -167,8 +406,23 @@ function Chat({ currentChat }) {
                 },
                 (status) => {
                     setStatusPreview(status.message || '')
+                },
+                {
+                    provider: selectedEntry.provider,
+                    model: selectedEntry.apiModelId,
+                    modelKey: selectedModelKey,
+                    reasoningEnabled: effectiveReasoningRequest,
+                    webSearchEnabled: effectiveWebRequest,
+                    inferenceForDoc: {
+                        reasoningEnabled: persistR,
+                        webSearchEnabled: persistW
+                    },
+                    attachmentFiles: fileSlots
                 }
             )
+            preparedAttachments.forEach((a) => {
+                if (a.previewUrl) URL.revokeObjectURL(a.previewUrl)
+            })
             setMessages(finalMessages)
             setReasoningPreview('')
             setStatusPreview('')
@@ -187,11 +441,24 @@ function Chat({ currentChat }) {
         }
     }
 
-    const handleAttachFile = (event) => {
-        const file = event.target.files[0]
-        if (file) {
-            setAttachments([...attachments, { id: Date.now(), name: file.name }])
-        }
+    const handleAttachFile = () => {
+        const input = fileInputRef.current
+        if (!input?.files?.length) return
+        setAttachments((prev) => {
+            const room = MAX_ATTACHMENT_SLOTS - prev.length
+            if (room <= 0) return prev
+            const toAdd = Array.from(input.files).slice(0, room)
+            const next = [...prev]
+            toAdd.forEach((file) => {
+                const attId = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+                const previewUrl = file.type.startsWith('image/')
+                    ? URL.createObjectURL(file)
+                    : null
+                next.push({ id: attId, file, previewUrl })
+            })
+            return next
+        })
+        input.value = ''
     }
 
     const handleKeyDown = (event) => {
@@ -202,253 +469,220 @@ function Chat({ currentChat }) {
     }
 
     const isEmpty = messages.length === 0 && !isSendingMessage
+    const showJumpLatest = !autoScrollEnabled && !isEmpty
+    const threadWidth = 'w-full max-w-[min(100%,calc(100vw-1rem))] sm:max-w-[800px]'
+    const composerWidth = 'w-full max-w-[min(100%,calc(100vw-1rem))] sm:max-w-[920px]'
+    const modelSelectorLabel = `${selectedEntry.label} model settings`
 
     return (
-        <Box
-            sx={{
-                display: 'flex',
-                flexDirection: 'column',
-                flex: 1,
-                minHeight: 0,
-                width: '100%',
-                maxWidth: '100%',
-                overflow: 'hidden',
-                position: 'relative',
-                boxSizing: 'border-box'
-            }}
-        >
-            <Box
+        <div className="relative box-border flex min-h-0 w-full max-w-full flex-1 flex-col overflow-hidden">
+            <ModelSettingsSheet
+                open={modelSheetOpen}
+                onClose={() => setModelSheetOpen(false)}
+                isMobile={isMobileLayout}
+                draftModelKey={sheetDraftModelKey}
+                onDraftModelChange={handleSheetDraftModelKeyChange}
+                draftReasoning={sheetDraftReasoning}
+                onDraftReasoningChange={setSheetDraftReasoning}
+                draftWebSearch={sheetDraftWeb}
+                onDraftWebSearchChange={setSheetDraftWeb}
+                models={modelsAllowed}
+                onApply={handleSheetApply}
+                readOnly={isExistingChat}
+            />
+
+            <div
                 ref={listRef}
                 onScroll={handleScroll}
-                sx={{
-                    flex: 1,
-                    minHeight: 0,
-                    overflowY: 'auto',
-                    overflowX: 'hidden',
-                    WebkitOverflowScrolling: 'touch',
-                    overscrollBehavior: 'contain',
-                    touchAction: 'pan-y',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    scrollbarGutter: 'stable'
-                }}
+                className="flex min-h-0 flex-1 flex-col items-center overflow-y-scroll overflow-x-hidden overscroll-y-contain [scrollbar-gutter:stable]"
             >
-                <Box
-                    sx={{
-                        ...chatThreadMaxSx,
-                        pt: { xs: 2, sm: 3 },
-                        pb: 2,
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: 3
-                    }}
-                >
+                <div className={clsx(threadWidth, 'flex min-w-0 flex-col gap-8 px-4 pb-4 pt-6 sm:px-6 sm:pt-8')}>
                     {isEmpty && (
                         <EmptyState />
                     )}
 
                     {!isEmpty && messages.map((message) => (
-                        <Box
+                        <div
                             key={message.id}
-                            sx={{
-                                display: 'flex',
-                                justifyContent: message.role === 'user'
-                                    ? 'flex-end'
-                                    : 'flex-start',
-                                width: '100%'
-                            }}
+                            className={clsx(
+                                'flex w-full',
+                                message.role === 'user' ? 'justify-end' : 'justify-start'
+                            )}
                         >
-                            <MessageBubble message={message} theme={theme} />
-                        </Box>
+                            <MessageBubble message={message} />
+                        </div>
                     ))}
 
                     {(reasoningPreview || statusPreview) && (
-                        <Box sx={{ display: 'flex', justifyContent: 'flex-start' }}>
+                        <div className="flex justify-start">
                             <ThinkingIndicator text={reasoningPreview || statusPreview} />
-                        </Box>
+                        </div>
                     )}
 
                     {sendError && (
-                        <Box
-                            sx={{
-                                display: 'flex',
-                                justifyContent: 'center',
-                                py: 1
-                            }}
-                        >
-                            <Typography color="error" variant="body2">
+                        <div className="flex justify-center py-2">
+                            <p className="text-center text-sm text-red-600 dark:text-red-400">
                                 {sendError}
-                            </Typography>
-                        </Box>
+                            </p>
+                        </div>
                     )}
-                </Box>
-            </Box>
+                </div>
+            </div>
 
-            <Box
-                sx={{
-                    flexShrink: 0,
-                    width: '100%',
-                    maxWidth: '100%',
-                    backgroundImage: theme.palette.mode === 'dark'
-                        ? 'linear-gradient(to top, rgba(11,11,15,1) 60%, rgba(11,11,15,0))'
-                        : 'linear-gradient(to top, rgba(247,247,248,1) 60%, rgba(247,247,248,0))',
-                    pt: { xs: 1.5, sm: 2 },
-                    pb: 0,
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    boxSizing: 'border-box'
+            <div
+                className={clsx(
+                    'relative flex shrink-0 flex-col items-center',
+                    'bg-gradient-to-t from-[#f7f7f8] from-60% to-transparent',
+                    'dark:from-[#0b0b0f] dark:to-transparent',
+                    'pl-[max(12px,env(safe-area-inset-left,0px))] pr-[max(12px,env(safe-area-inset-right,0px))]',
+                    'sm:pl-[max(24px,env(safe-area-inset-left,0px))] sm:pr-[max(24px,env(safe-area-inset-right,0px))]',
+                    'pt-3 sm:pt-4'
+                )}
+                style={{
+                    paddingBottom: keyboardInset > 0
+                        ? '10px'
+                        : 'calc(12px + env(safe-area-inset-bottom, 0px))'
                 }}
             >
-                <Box sx={chatComposerMaxSx}>
-                    {canSendMessages ? (
-                        <Box
-                            component="form"
-                            onSubmit={(e) => {
-                                e.preventDefault()
-                                handleSendMessage()
-                            }}
-                            sx={{
-                                display: 'flex',
-                                alignItems: 'flex-end',
-                                gap: 1,
-                                p: 1,
-                                borderRadius: '24px',
-                                backgroundColor: 'background.paper',
-                                border: `1px solid ${theme.palette.divider}`,
-                                boxShadow: theme.palette.mode === 'dark'
-                                    ? '0 8px 32px -16px rgba(0,0,0,0.6)'
-                                    : '0 8px 32px -16px rgba(15,23,42,0.12)',
-                                transition: 'border-color 120ms ease, box-shadow 120ms ease',
-                                '&:focus-within': {
-                                    borderColor: 'primary.main',
-                                    boxShadow: theme.palette.mode === 'dark'
-                                        ? '0 0 0 3px rgba(52,211,153,0.20)'
-                                        : '0 0 0 3px rgba(16,185,129,0.18)'
-                                }
-                            }}
+                {showJumpLatest && (
+                    <div className={clsx('relative mb-2 flex w-full justify-end', composerWidth)}>
+                        <button
+                            type="button"
+                            onClick={scrollToLatest}
+                            className="inline-flex items-center gap-1 rounded-full border border-slate-200/90 bg-white/95 px-3 py-1.5 text-xs font-semibold text-slate-800 shadow-md backdrop-blur dark:border-white/[0.12] dark:bg-zinc-900/95 dark:text-zinc-100"
                         >
-                            <Tooltip title="Attach file">
-                                <IconButton
-                                    component="label"
-                                    sx={{
-                                        color: 'text.secondary',
-                                        alignSelf: 'flex-end',
-                                        mb: 0.5
-                                    }}
-                                    disabled={!canSendMessages || isSendingMessage}
-                                >
-                                    <AttachFileRoundedIcon fontSize="small" />
-                                    <input
-                                        type="file"
-                                        hidden
-                                        onChange={handleAttachFile}
-                                    />
-                                </IconButton>
-                            </Tooltip>
-                            <TextareaAutosize
-                                ref={composerRef}
-                                minRows={1}
-                                maxRows={10}
-                                placeholder="Ask anything..."
-                                value={currentMessage}
-                                onChange={(e) => setCurrentMessage(e.target.value)}
-                                onKeyDown={handleKeyDown}
-                                style={{
-                                    flex: 1,
-                                    padding: '10px 8px',
-                                    border: 'none',
-                                    outline: 'none',
-                                    backgroundColor: 'transparent',
-                                    color: theme.palette.text.primary,
-                                    resize: 'none',
-                                    fontSize: '0.95rem',
-                                    fontFamily: theme.typography.fontFamily,
-                                    lineHeight: 1.5
+                            Latest
+                            <ChevronDown className="h-4 w-4" aria-hidden />
+                        </button>
+                    </div>
+                )}
+
+                <div className={clsx(composerWidth, 'space-y-2')}>
+                    {canSendMessages ? (
+                        <>
+                            {attachments.length > 0 && (
+                                <div className="flex flex-wrap gap-2 pb-1">
+                                    {attachments.map((a) => (
+                                        <div
+                                            key={a.id}
+                                            className="group relative h-14 w-14 shrink-0 overflow-hidden rounded-xl border border-slate-200/90 bg-slate-100 dark:border-white/[0.12] dark:bg-zinc-800/80"
+                                        >
+                                            {a.previewUrl ? (
+                                                <img
+                                                    src={a.previewUrl}
+                                                    alt=""
+                                                    className="h-full w-full object-cover"
+                                                />
+                                            ) : (
+                                                <div className="flex h-full w-full flex-col items-center justify-center gap-0.5 px-1">
+                                                    <Paperclip className="h-4 w-4 shrink-0 text-slate-500 dark:text-zinc-400" aria-hidden />
+                                                    <span className="max-w-full truncate text-[9px] font-medium leading-tight text-slate-600 dark:text-zinc-300">
+                                                        {(a.file.name.split('.').pop() || 'file').slice(0, 6)}
+                                                    </span>
+                                                </div>
+                                            )}
+                                            {isMobileLayout && (
+                                                <button
+                                                    type="button"
+                                                    className="absolute inset-0 z-[1] rounded-xl bg-transparent active:bg-black/10"
+                                                    aria-label={`Remove ${a.file.name}`}
+                                                    onClick={() => removeAttachment(a.id)}
+                                                />
+                                            )}
+                                            <button
+                                                type="button"
+                                                className="absolute right-0.5 top-0.5 z-[2] flex h-6 w-6 items-center justify-center rounded-md bg-black/55 text-white opacity-0 shadow-md transition-opacity hover:bg-black/70 focus-visible:opacity-100 group-hover:opacity-100 max-[600px]:hidden"
+                                                aria-label={`Remove ${a.file.name}`}
+                                                onClick={() => removeAttachment(a.id)}
+                                            >
+                                                <X className="h-3.5 w-3.5" strokeWidth={2.5} aria-hidden />
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+
+                            <form
+                                className="flex items-center gap-2 rounded-[24px] border border-slate-200/90 bg-white p-2 shadow-lg shadow-slate-900/5 transition focus-within:border-brand-500 focus-within:ring-2 focus-within:ring-brand-500/20 dark:border-white/[0.10] dark:bg-zinc-900 dark:shadow-black/40"
+                                onSubmit={(e) => {
+                                    e.preventDefault()
+                                    handleSendMessage()
                                 }}
-                                disabled={!canSendMessages}
-                            />
-                            <Tooltip title={isSendingMessage ? 'Generating...' : 'Send'}>
-                                <span>
-                                    <IconButton
-                                        type="submit"
+                            >
+                                <label
+                                    htmlFor="chat-attach-input"
+                                    className="flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-xl text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:text-zinc-400 dark:hover:bg-white/[0.06] dark:hover:text-zinc-200"
+                                >
+                                    <Paperclip className="h-[18px] w-[18px]" aria-hidden />
+                                    <input
+                                        ref={fileInputRef}
+                                        id="chat-attach-input"
+                                        type="file"
+                                        multiple
+                                        className="hidden"
+                                        onChange={handleAttachFile}
                                         disabled={
                                             !canSendMessages
                                             || isSendingMessage
-                                            || currentMessage.trim() === ''
+                                            || attachments.length >= MAX_ATTACHMENT_SLOTS
                                         }
-                                        sx={{
-                                            alignSelf: 'flex-end',
-                                            mb: 0.5,
-                                            width: 36,
-                                            height: 36,
-                                            color: '#fff',
-                                            backgroundImage: brandGradient,
-                                            '&:hover': {
-                                                backgroundImage: brandGradient,
-                                                filter: 'brightness(1.05)'
-                                            },
-                                            '&.Mui-disabled': {
-                                                backgroundImage: 'none',
-                                                backgroundColor: (
-                                                    theme.palette.action.disabledBackground
-                                                ),
-                                                color: theme.palette.action.disabled
-                                            }
-                                        }}
-                                    >
-                                        {isSendingMessage
-                                            ? <StopRoundedIcon fontSize="small" />
-                                            : <ArrowUpwardRoundedIcon fontSize="small" />}
-                                    </IconButton>
-                                </span>
-                            </Tooltip>
-                        </Box>
-                    ) : (
-                        <Box
-                            sx={{
-                                p: 2.5,
-                                borderRadius: 3,
-                                backgroundColor: 'background.paper',
-                                border: `1px solid ${theme.palette.divider}`,
-                                textAlign: 'center'
-                            }}
-                        >
-                            <Typography variant="body2" color="text.secondary">
-                                You cannot send messages because you have no saved API key.
-                                {' '}
-                                <Box
-                                    component="span"
-                                    onClick={() => navigate('/user')}
-                                    sx={{
-                                        color: 'primary.main',
-                                        cursor: 'pointer',
-                                        fontWeight: 600,
-                                        '&:hover': { textDecoration: 'underline' }
-                                    }}
+                                    />
+                                </label>
+                                <button
+                                    type="button"
+                                    onClick={() => setModelSheetOpen(true)}
+                                    aria-label={modelSelectorLabel}
+                                    title={modelSelectorLabel}
+                                    className="group relative flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-slate-200/80 bg-white text-slate-800 shadow-sm transition hover:-translate-y-[1px] hover:bg-slate-50 hover:shadow dark:border-white/[0.10] dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800"
                                 >
-                                    Add one in settings.
-                                </Box>
-                            </Typography>
-                        </Box>
+                                    <ProviderLogo provider={provider} size={20} />
+                                    <span className="pointer-events-none absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border border-white bg-brand-500 dark:border-zinc-900" />
+                                </button>
+                                <textarea
+                                    ref={composerRef}
+                                    rows={1}
+                                    placeholder="Ask anything..."
+                                    value={currentMessage}
+                                    onChange={(e) => setCurrentMessage(e.target.value)}
+                                    onKeyDown={handleKeyDown}
+                                    disabled={!canSendMessages}
+                                    className="max-h-[240px] min-h-[44px] min-w-0 flex-1 resize-none border-0 bg-transparent px-1 py-2.5 text-[max(16px,0.95rem)] leading-relaxed text-slate-900 outline-none placeholder:text-slate-400 dark:text-zinc-100 dark:placeholder:text-zinc-500"
+                                />
+                                <button
+                                    type="submit"
+                                    disabled={
+                                        !canSendMessages
+                                        || isSendingMessage
+                                        || (currentMessage.trim() === ''
+                                            && attachments.length === 0)
+                                    }
+                                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-brand-600 to-brand-400 text-white shadow-md shadow-brand-500/25 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:bg-none disabled:text-slate-400 disabled:shadow-none dark:disabled:bg-zinc-800 dark:disabled:text-zinc-600"
+                                    title={isSendingMessage ? 'Generating…' : 'Send'}
+                                >
+                                    {isSendingMessage
+                                        ? <Square className="h-4 w-4 fill-current" />
+                                        : <ArrowUp className="h-4 w-4" />}
+                                </button>
+                            </form>
+                        </>
+                    ) : (
+                        <div className="rounded-2xl border border-slate-200/90 bg-white p-6 text-center dark:border-white/[0.10] dark:bg-zinc-900">
+                            <p className="text-sm text-slate-600 dark:text-zinc-400">
+                                You cannot send messages because no provider API key is saved.
+                                {' '}
+                                <button
+                                    type="button"
+                                    className="font-semibold text-brand-600 hover:underline dark:text-brand-400"
+                                    onClick={() => navigate('/user')}
+                                >
+                                    Add keys in settings.
+                                </button>
+                            </p>
+                        </div>
                     )}
-                    <Typography
-                        variant="caption"
-                        color="text.secondary"
-                        align="center"
-                        sx={{
-                            display: 'block',
-                            mt: 0.75,
-                            px: 0.5,
-                            lineHeight: 1.35
-                        }}
-                    >
-                        FrugalGPT can make mistakes. Verify important info.
-                    </Typography>
-                </Box>
-            </Box>
-        </Box>
+                </div>
+            </div>
+        </div>
     )
 }
 

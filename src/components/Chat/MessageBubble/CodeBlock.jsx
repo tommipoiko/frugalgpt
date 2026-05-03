@@ -1,12 +1,8 @@
 import React, { useState } from 'react'
-import {
-    Box, IconButton, Tooltip, Typography
-} from '@mui/material'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism'
 import { CopyToClipboard } from 'react-copy-to-clipboard'
-import ContentCopyRoundedIcon from '@mui/icons-material/ContentCopyRounded'
-import CheckRoundedIcon from '@mui/icons-material/CheckRounded'
+import { Copy, Check } from 'lucide-react'
 
 function CodeBlock({
     inline, className, children, ...props
@@ -30,55 +26,23 @@ function CodeBlock({
     }
 
     return (
-        <Box
-            sx={{
-                my: 1.25,
-                borderRadius: 2,
-                overflow: 'hidden',
-                border: (theme) => (theme.palette.mode === 'dark'
-                    ? '1px solid rgba(255,255,255,0.08)'
-                    : '1px solid rgba(15,23,42,0.10)'),
-                backgroundColor: '#1E1E2E'
-            }}
-        >
-            <Box
-                sx={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    px: 1.5,
-                    py: 0.75,
-                    backgroundColor: 'rgba(255,255,255,0.05)',
-                    borderBottom: '1px solid rgba(255,255,255,0.06)'
-                }}
-            >
-                <Typography
-                    variant="caption"
-                    sx={{
-                        color: 'rgba(255,255,255,0.7)',
-                        fontFamily: '"JetBrains Mono", ui-monospace, SFMono-Regular, monospace',
-                        fontSize: '0.75rem',
-                        letterSpacing: '0.04em'
-                    }}
-                >
+        <div className="my-4 overflow-hidden rounded-xl border border-slate-200/80 bg-[#1e1e2e] dark:border-white/[0.08]">
+            <div className="flex items-center justify-between border-b border-white/[0.06] bg-white/[0.05] px-3 py-2">
+                <span className="font-mono text-[0.75rem] tracking-wide text-white/70">
                     {language}
-                </Typography>
+                </span>
                 <CopyToClipboard text={code} onCopy={handleCopied}>
-                    <Tooltip title={copied ? 'Copied!' : 'Copy code'}>
-                        <IconButton
-                            size="small"
-                            sx={{
-                                color: copied ? '#86efac' : 'rgba(255,255,255,0.75)',
-                                '&:hover': { backgroundColor: 'rgba(255,255,255,0.08)' }
-                            }}
-                        >
-                            {copied
-                                ? <CheckRoundedIcon sx={{ fontSize: 16 }} />
-                                : <ContentCopyRoundedIcon sx={{ fontSize: 16 }} />}
-                        </IconButton>
-                    </Tooltip>
+                    <button
+                        type="button"
+                        className="rounded-lg p-1.5 text-white/75 transition hover:bg-white/10"
+                        title={copied ? 'Copied' : 'Copy'}
+                    >
+                        {copied
+                            ? <Check className="h-4 w-4 text-emerald-300" />
+                            : <Copy className="h-4 w-4" />}
+                    </button>
                 </CopyToClipboard>
-            </Box>
+            </div>
             <SyntaxHighlighter
                 style={oneDark}
                 language={language}
@@ -95,7 +59,7 @@ function CodeBlock({
             >
                 {code}
             </SyntaxHighlighter>
-        </Box>
+        </div>
     )
 }
 

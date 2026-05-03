@@ -1,8 +1,8 @@
 # FrugalGPT
 
-FrugalGPT is a React + Firebase chat app where each signed-in user can bring their own OpenAI API key.
-The app uses the OpenAI Responses API with `gpt-5` by default and stores chat history in Firestore.
-All OpenAI calls are executed on Firebase Cloud Functions, not in the browser.
+FrugalGPT is a React + Firebase chat app where each signed-in user can bring their own provider API keys.
+The app supports OpenAI, Anthropic, Google, and Mistral models and stores chat history in Firestore.
+All provider API calls are executed on Firebase Cloud Functions, not in the browser.
 
 ## Features
 
@@ -12,14 +12,14 @@ All OpenAI calls are executed on Firebase Cloud Functions, not in the browser.
 - Markdown and code block rendering in assistant responses
 - Theme preferences (system, light, dark)
 
-## OpenAI setup
+## Provider setup
 
 1. Sign in to the app.
 2. Open user settings.
-3. Save your OpenAI API key.
+3. Save one or more provider API keys.
 
-You do not need to provide an Assistant ID anymore. The app sends conversation history directly to the Responses API.
-The frontend calls the HTTPS function `generateChatResponseHttp`.
+You do not need to provide an Assistant ID anymore. The app sends conversation history directly to provider chat APIs.
+The frontend calls the streaming HTTPS function `generateChatResponseStreamHttp`.
 Functions are deployed in `europe-north1` by default.
 
 ## Local development

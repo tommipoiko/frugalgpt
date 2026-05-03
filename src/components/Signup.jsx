@@ -1,14 +1,13 @@
 import React, { useState } from 'react'
-import {
-    TextField, Button, Typography, Box, Paper, Alert
-} from '@mui/material'
 import { createUserWithEmailAndPassword } from 'firebase/auth'
 import { useNavigate, Link } from 'react-router-dom'
 import { auth } from '../services/firebase'
 import BrandMark from './Brand/BrandMark'
 import { brandGradient } from '../theme'
+import useKeyboardOverlapBottom from '../hooks/useKeyboardOverlapBottom'
 
 function Signup() {
+    const keyboardInset = useKeyboardOverlapBottom()
     const [email, setEmail] = useState('')
     const [password, setPassword] = useState('')
     const [error, setError] = useState('')
@@ -28,120 +27,86 @@ function Signup() {
         }
     }
 
+    const pb = `${32 + keyboardInset}px`
+
     return (
-        <Box
-            sx={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                flex: 1,
-                minHeight: 0,
-                overflow: 'auto',
-                width: '100%',
-                maxWidth: '100%',
-                boxSizing: 'border-box',
-                py: 4
+        <div
+            className="flex flex-1 min-h-0 w-full max-w-full flex-col items-center justify-center overflow-auto scroll-smooth [-webkit-overflow-scrolling:touch]"
+            style={{
+                paddingTop: '32px',
+                paddingBottom: pb,
+                scrollPaddingBottom: keyboardInset ? `${keyboardInset + 24}px` : undefined
             }}
         >
-            <Paper
-                elevation={0}
-                variant="outlined"
-                sx={{
-                    width: '100%',
-                    maxWidth: 420,
-                    borderRadius: 4,
-                    overflow: 'hidden'
-                }}
-            >
-                <Box
-                    sx={{
-                        backgroundImage: brandGradient,
-                        color: '#fff',
-                        px: 4,
-                        py: 3.5,
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: 1
-                    }}
+            <div className="w-full max-w-[420px] overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm dark:border-white/[0.08] dark:bg-zinc-900">
+                <div
+                    className="flex flex-col gap-2 px-8 py-8 text-white"
+                    style={{ backgroundImage: brandGradient }}
                 >
-                    <BrandMark size={32} wordmarkVariant="h6" showWordmark={false} />
-                    <Typography variant="h5" sx={{ fontWeight: 700 }}>
-                        Create your account
-                    </Typography>
-                    <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                        Bring your own OpenAI key and start chatting
-                    </Typography>
-                </Box>
+                    <BrandMark size={32} showWordmark={false} />
+                    <h1 className="text-xl font-bold">Create your account</h1>
+                    <p className="text-sm opacity-90">Bring your own API keys and start chatting</p>
+                </div>
 
-                <Box sx={{ px: 4, py: 3.5 }}>
+                <div className="px-8 py-8">
                     {error && (
-                        <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>
+                        <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800 dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-200">
                             {error}
-                        </Alert>
+                        </div>
                     )}
                     {message && (
-                        <Alert severity="success" sx={{ mb: 2, borderRadius: 2 }}>
+                        <div className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900 dark:border-emerald-900/50 dark:bg-emerald-950/40 dark:text-emerald-200">
                             {message}
-                        </Alert>
+                        </div>
                     )}
-                    <Box
-                        component="form"
+                    <form
+                        className="flex flex-col gap-4"
                         onSubmit={(event) => {
                             event.preventDefault()
                             handleSignUp()
                         }}
-                        sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}
                     >
-                        <TextField
-                            label="Email"
-                            type="email"
-                            fullWidth
-                            value={email}
-                            onChange={(e) => setEmail(e.target.value)}
-                            autoComplete="email"
-                        />
-                        <TextField
-                            label="Password"
-                            type="password"
-                            fullWidth
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            autoComplete="new-password"
-                        />
-                        <Button
+                        <label className="block text-sm font-medium text-slate-700 dark:text-zinc-300">
+                            <span className="block">Email</span>
+                            <input
+                                type="email"
+                                autoComplete="email"
+                                value={email}
+                                onChange={(e) => setEmail(e.target.value)}
+                                className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-base dark:border-white/10 dark:bg-zinc-800"
+                            />
+                        </label>
+                        <label className="block text-sm font-medium text-slate-700 dark:text-zinc-300">
+                            <span className="block">Password</span>
+                            <input
+                                type="password"
+                                autoComplete="new-password"
+                                value={password}
+                                onChange={(e) => setPassword(e.target.value)}
+                                className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-base dark:border-white/10 dark:bg-zinc-800"
+                            />
+                        </label>
+                        <button
                             type="submit"
-                            variant="contained"
-                            size="large"
-                            fullWidth
-                            sx={{ mt: 0.5, py: 1.25 }}
+                            className="mt-1 w-full rounded-[10px] py-3 text-base font-semibold text-white"
+                            style={{ backgroundImage: brandGradient }}
                         >
                             Create account
-                        </Button>
-                    </Box>
-                    <Typography
-                        align="center"
-                        variant="body2"
-                        color="text.secondary"
-                        sx={{ mt: 3 }}
-                    >
+                        </button>
+                    </form>
+                    <p className="mt-8 text-center text-sm text-slate-600 dark:text-zinc-400">
                         Already have an account?
                         {' '}
-                        <Link to="/signin" style={{ textDecoration: 'none' }}>
-                            <Box
-                                component="span"
-                                sx={{
-                                    color: 'primary.main',
-                                    fontWeight: 600,
-                                    '&:hover': { textDecoration: 'underline' }
-                                }}
-                            >
-                                Sign in
-                            </Box>
+                        <Link
+                            to="/signin"
+                            className="font-semibold text-emerald-600 hover:underline dark:text-emerald-400"
+                        >
+                            Sign in
                         </Link>
-                    </Typography>
-                </Box>
-            </Paper>
-        </Box>
+                    </p>
+                </div>
+            </div>
+        </div>
     )
 }
 

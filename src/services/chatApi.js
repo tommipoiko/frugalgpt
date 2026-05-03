@@ -1,18 +1,25 @@
 import {
-    addDoc, collection, doc, getDoc, serverTimestamp, updateDoc
+    addDoc, collection, doc, getDoc, serverTimestamp, setDoc, updateDoc
 } from 'firebase/firestore'
 import { auth, db } from './firebase'
+import { buildAttachmentParts } from '../utils/attachmentParts'
 
-const createNameForChat = async (message) => {
-    if (!message) return null
+const createNameForChat = async (titleSeed) => {
+    if (!titleSeed || typeof titleSeed !== 'string' || !titleSeed.trim()) return null
     return `Chat-${Date.now()}`
 }
 
 const toOpenAiMessages = (messages) => messages
-    .filter((message) => message?.content && ['user', 'system'].includes(message.role))
+    .filter((message) => {
+        if (!message || !['user', 'system'].includes(message.role)) return false
+        const text = typeof message.content === 'string' ? message.content.trim() : ''
+        if (message.role === 'system') return text.length > 0
+        const hasAttachments = Array.isArray(message.attachments) && message.attachments.length > 0
+        return text.length > 0 || hasAttachments
+    })
     .map((message) => ({
         role: message.role,
-        content: message.content
+        content: typeof message.content === 'string' ? message.content : ''
     }))
 
 const CHAT_RESPONSE_STREAM_HTTP_URL = process.env.REACT_APP_CHAT_RESPONSE_STREAM_HTTP_URL
@@ -21,6 +28,15 @@ const CHAT_RESPONSE_STREAM_HTTP_URL = process.env.REACT_APP_CHAT_RESPONSE_STREAM
 const LIST_AVAILABLE_MODELS_HTTP_URL = process.env.REACT_APP_LIST_AVAILABLE_MODELS_HTTP_URL
     || 'https://europe-north1-frugalgpt.cloudfunctions.net/'
     + 'listAvailableModelsHttp'
+const CURATE_MODELS_HTTP_URL = process.env.REACT_APP_CURATE_MODELS_HTTP_URL
+    || 'https://europe-north1-frugalgpt.cloudfunctions.net/'
+    + 'curateModelsHttp'
+
+/** Firestore rejects `undefined` anywhere under `messages`. */
+const omitUndefinedKeys = (obj) => {
+    if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return obj
+    return Object.fromEntries(Object.entries(obj).filter(([, v]) => v !== undefined))
+}
 
 const parseStreamEventLines = (rawChunk) => rawChunk
     .split('\n')
@@ -42,7 +58,8 @@ const sendMessage = async (
     onAssistantDelta = null,
     onReasoningDelta = null,
     onSourcesUpdate = null,
-    onStatusUpdate = null
+    onStatusUpdate = null,
+    options = {}
 ) => {
     const user = auth.currentUser
     if (!user) {
@@ -56,14 +73,25 @@ const sendMessage = async (
         throw new Error('User settings not found')
     }
 
-    const data = docSnap.data()
-    const apiKey = data?.openAi?.openaiKey
+    const {
+        provider = 'openai',
+        model,
+        modelKey = null,
+        reasoningEnabled = true,
+        webSearchEnabled = true,
+        inferenceForDoc = null,
+        attachmentFiles = []
+    } = options
 
-    if (!apiKey) {
-        throw new Error('OpenAI API key is missing')
-    }
+    const docReasoning = inferenceForDoc?.reasoningEnabled
+    const docWeb = inferenceForDoc?.webSearchEnabled
+    const persistReasoning = typeof docReasoning === 'boolean' ? docReasoning : reasoningEnabled
+    const persistWeb = typeof docWeb === 'boolean' ? docWeb : webSearchEnabled
 
     const conversation = toOpenAiMessages([...existingMessages, message])
+    const attachmentParts = attachmentFiles.length
+        ? await buildAttachmentParts(attachmentFiles)
+        : []
     const idToken = await user.getIdToken()
     const response = await fetch(CHAT_RESPONSE_STREAM_HTTP_URL, {
         method: 'POST',
@@ -72,7 +100,12 @@ const sendMessage = async (
             Authorization: `Bearer ${idToken}`
         },
         body: JSON.stringify({
-            messages: conversation
+            messages: conversation,
+            attachmentParts,
+            provider,
+            model: model || undefined,
+            reasoningEnabled,
+            webSearchEnabled
         })
     })
 
@@ -96,6 +129,7 @@ const sendMessage = async (
     let chunkRemainder = ''
     let assistantResponse = ''
     let generatedTitle = null
+    let streamErrorMessage = ''
     const collectedSources = []
     const seenSourceUrls = new Set()
     const addSource = (source) => {
@@ -148,6 +182,12 @@ const sendMessage = async (
                 onStatusUpdate({ state: 'done', message: '' })
             }
         }
+        if (event.type === 'error') {
+            streamErrorMessage = event.error || 'Failed generating response.'
+            if (onStatusUpdate) {
+                onStatusUpdate({ state: 'error', message: streamErrorMessage })
+            }
+        }
     }
 
     // eslint-disable-next-line no-constant-condition
@@ -168,8 +208,12 @@ const sendMessage = async (
     const finalEvents = parseStreamEventLines(chunkRemainder)
     finalEvents.forEach(processStreamEvent)
 
+    if (streamErrorMessage) {
+        throw new Error(streamErrorMessage)
+    }
+
     if (!assistantResponse) {
-        throw new Error('No response received from OpenAI')
+        throw new Error('No response received from the model.')
     }
 
     const assistantMessage = {
@@ -178,15 +222,34 @@ const sendMessage = async (
         content: assistantResponse,
         sources: collectedSources
     }
-    const finalMessages = [...existingMessages, message, assistantMessage]
+    const finalMessages = [...existingMessages, message, assistantMessage].map((m) => {
+        const cleaned = omitUndefinedKeys(m)
+        if (Array.isArray(cleaned.sources)) {
+            cleaned.sources = cleaned.sources.map((s) => omitUndefinedKeys(s))
+        }
+        return cleaned
+    })
+
+    const inferenceFields = {
+        provider,
+        model: model || null,
+        ...(typeof modelKey === 'string' && modelKey.trim() ? { modelKey: modelKey.trim() } : {}),
+        reasoningEnabled: persistReasoning,
+        webSearchEnabled: persistWeb
+    }
 
     if (!chatId) {
-        const fallbackTitle = await createNameForChat(message.content)
+        const titleSeed = message.content?.trim()
+            || (Array.isArray(message.attachments) && message.attachments.length
+                ? message.attachments.map((a) => a.name).filter(Boolean).join(', ')
+                : '')
+        const fallbackTitle = await createNameForChat(titleSeed)
         const createdChat = await addDoc(collection(db, 'chats'), {
             name: generatedTitle || fallbackTitle,
             userId: user.uid,
             messages: finalMessages,
-            lastUpdated: serverTimestamp()
+            lastUpdated: serverTimestamp(),
+            ...inferenceFields
         })
         return { chatId: createdChat.id, finalMessages }
     }
@@ -194,13 +257,14 @@ const sendMessage = async (
     await updateDoc(doc(db, 'chats', chatId), {
         messages: finalMessages,
         lastUpdated: serverTimestamp(),
-        userId: user.uid
+        userId: user.uid,
+        ...inferenceFields
     })
 
     return { chatId, finalMessages }
 }
 
-const fetchAvailableModels = async () => {
+const fetchAvailableModels = async (provider = 'openai') => {
     const user = auth.currentUser
     if (!user) {
         throw new Error('User not authenticated')
@@ -214,7 +278,7 @@ const fetchAvailableModels = async () => {
                 'Content-Type': 'application/json',
                 Authorization: `Bearer ${idToken}`
             },
-            body: JSON.stringify({})
+            body: JSON.stringify({ provider })
         })
     } catch (error) {
         throw new Error(
@@ -235,13 +299,68 @@ const fetchAvailableModels = async () => {
     }
 
     const payload = await response.json()
+    const defaults = {
+        openai: 'gpt-5.4',
+        anthropic: 'claude-sonnet-4-6',
+        google: 'gemini-3.1-pro-preview',
+        mistral: 'magistral-medium-latest'
+    }
     return {
         models: Array.isArray(payload.models) ? payload.models : [],
-        defaultModel: payload.defaultModel || 'gpt-5'
+        defaultModel: payload.defaultModel || defaults[provider] || 'gpt-5'
     }
+}
+
+const updateChatInferenceDoc = async (chatId, inferenceFields) => {
+    const user = auth.currentUser
+    if (!user || !chatId) return
+    await updateDoc(doc(db, 'chats', chatId), {
+        ...inferenceFields,
+        lastUpdated: serverTimestamp(),
+        userId: user.uid
+    })
+}
+
+const saveUserChatDefaults = async (defaults) => {
+    const user = auth.currentUser
+    if (!user) throw new Error('User not authenticated')
+    await setDoc(doc(db, 'users', user.uid), {
+        chatDefaults: defaults,
+        lastUpdated: serverTimestamp()
+    }, { merge: true })
+}
+
+const runModelCuration = async () => {
+    const user = auth.currentUser
+    if (!user) {
+        throw new Error('User not authenticated')
+    }
+    const idToken = await user.getIdToken()
+    const response = await fetch(CURATE_MODELS_HTTP_URL, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${idToken}`
+        },
+        body: JSON.stringify({})
+    })
+    if (!response.ok) {
+        let errorMessage = 'Model refresh failed'
+        try {
+            const errorData = await response.json()
+            errorMessage = errorData.error || errorMessage
+        } catch (e) {
+            // ignore
+        }
+        throw new Error(errorMessage)
+    }
+    return response.json()
 }
 
 export default {
     sendMessage,
-    fetchAvailableModels
+    fetchAvailableModels,
+    updateChatInferenceDoc,
+    saveUserChatDefaults,
+    runModelCuration
 }

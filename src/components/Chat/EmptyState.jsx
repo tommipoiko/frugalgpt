@@ -1,60 +1,25 @@
 import React from 'react'
-import {
-    Box, Typography
-} from '@mui/material'
-import AutoAwesomeRoundedIcon from '@mui/icons-material/AutoAwesomeRounded'
-import { brandGradient } from '../../theme'
+import { Sparkles } from 'lucide-react'
 
 function EmptyState() {
     return (
-        <Box
-            sx={{
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                py: { xs: 6, sm: 8 },
-                px: 2,
-                gap: 4,
-                width: '100%'
-            }}
-        >
-            <Box sx={{ textAlign: 'center' }}>
-                <Box
-                    sx={{
-                        width: 56,
-                        height: 56,
-                        margin: '0 auto 18px',
-                        borderRadius: '18px',
-                        backgroundImage: brandGradient,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        color: '#fff',
-                        boxShadow: '0 18px 40px -16px rgba(16,185,129,0.7)'
-                    }}
+        <div className="flex w-full flex-col items-center justify-center gap-10 px-2 py-12 sm:py-16">
+            <div className="text-center">
+                <div
+                    className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-[18px] bg-gradient-to-br from-brand-600 to-brand-400 text-white shadow-xl shadow-brand-500/30"
                 >
-                    <AutoAwesomeRoundedIcon />
-                </Box>
-                <Typography
-                    variant="h4"
-                    sx={{
-                        fontWeight: 700,
-                        backgroundImage: brandGradient,
-                        WebkitBackgroundClip: 'text',
-                        WebkitTextFillColor: 'transparent',
-                        backgroundClip: 'text',
-                        mb: 1
-                    }}
+                    <Sparkles className="h-7 w-7" aria-hidden />
+                </div>
+                <h2
+                    className="mb-2 bg-gradient-to-r from-brand-700 via-brand-500 to-brand-400 bg-clip-text text-2xl font-bold tracking-tight text-transparent sm:text-3xl"
                 >
                     How can I help today?
-                </Typography>
-                <Typography variant="body1" color="text.secondary">
-                    Ask anything. I can search the web for the latest information.
-                </Typography>
-            </Box>
-
-        </Box>
+                </h2>
+                <p className="text-base text-slate-600 dark:text-zinc-400">
+                    Ask anything. I can search the web for the latest information when your provider supports it.
+                </p>
+            </div>
+        </div>
     )
 }
 

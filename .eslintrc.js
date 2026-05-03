@@ -20,6 +20,20 @@ module.exports = {
             parserOptions: {
                 sourceType: 'script'
             }
+        },
+        {
+            files: ['**/*.jsx'],
+            rules: {
+                // Tailwind class lists routinely exceed 100 cols; keep strict in .js services.
+                'max-len': 'off'
+            }
+        },
+        {
+            files: ['src/components/Sidenav.jsx'],
+            rules: {
+                // Rename dialog should focus the input when opened.
+                'jsx-a11y/no-autofocus': 'off'
+            }
         }
     ],
     parserOptions: {
@@ -41,7 +55,9 @@ module.exports = {
         'react-hooks/exhaustive-deps': 'off',
         semi: ['error', 'never'],
         'comma-dangle': ['error', 'never'],
-        'max-len': ['error', { code: 100 }]
+        'max-len': ['error', { code: 100 }],
+        // Tailwind layouts often wrap inputs in extra elements; nesting checks are noisy.
+        'jsx-a11y/label-has-associated-control': 'off'
     },
     settings: {
         react: {

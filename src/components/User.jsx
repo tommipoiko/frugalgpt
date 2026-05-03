@@ -1,52 +1,63 @@
-import React, { useState, useEffect, useCallback } from 'react'
+import React, {
+    useState, useEffect
+} from 'react'
 import {
-    TextField, Button, Container, Typography, Card, CardContent, Box,
-    ToggleButton, ToggleButtonGroup, Stack, Alert, IconButton, InputAdornment,
-    CircularProgress, Divider, FormControl, InputLabel, Select, MenuItem
-} from '@mui/material'
-import LightModeRoundedIcon from '@mui/icons-material/LightModeRounded'
-import DarkModeRoundedIcon from '@mui/icons-material/DarkModeRounded'
-import SettingsBrightnessRoundedIcon from '@mui/icons-material/SettingsBrightnessRounded'
-import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined'
-import VisibilityOffOutlinedIcon from '@mui/icons-material/VisibilityOffOutlined'
-import KeyRoundedIcon from '@mui/icons-material/KeyRounded'
+    Key, Sun, Moon, Monitor, Eye, EyeOff, Loader2
+} from 'lucide-react'
+import clsx from 'clsx'
 import {
-    doc, getDoc, setDoc
+    doc, getDoc, setDoc, deleteField
 } from 'firebase/firestore'
 import { auth, db } from '../services/firebase'
-import chatApi from '../services/chatApi'
+import useKeyboardOverlapBottom from '../hooks/useKeyboardOverlapBottom'
+
+const PROVIDER_CONFIG = [
+    { id: 'openai', label: 'OpenAI', placeholder: 'sk-...' },
+    { id: 'anthropic', label: 'Anthropic', placeholder: 'sk-ant-...' },
+    { id: 'google', label: 'Google AI (Gemini)', placeholder: 'AIza...' },
+    { id: 'mistral', label: 'Mistral', placeholder: '...' }
+]
+
+const emptyProvidersState = () => ({
+    openai: { apiKey: '' },
+    anthropic: { apiKey: '' },
+    google: { apiKey: '' },
+    mistral: { apiKey: '' }
+})
+
+function hydrateProvidersFromDoc(userData) {
+    const next = emptyProvidersState()
+    const stored = userData?.providers
+    if (stored && typeof stored === 'object') {
+        PROVIDER_CONFIG.forEach(({ id }) => {
+            const row = stored[id]
+            if (row && typeof row === 'object') {
+                next[id] = {
+                    apiKey: typeof row.apiKey === 'string' ? row.apiKey : ''
+                }
+            }
+        })
+    }
+    const legacy = userData?.openAi
+    if (legacy?.openaiKey && !next.openai.apiKey) {
+        next.openai = { apiKey: legacy.openaiKey }
+    }
+    return next
+}
 
 function User({ setMode }) {
-    const [apiKey, setApiKey] = useState('')
-    const [showKey, setShowKey] = useState(false)
-    const [selectedModel, setSelectedModel] = useState('gpt-5')
-    const [availableModels, setAvailableModels] = useState([])
-    const [modelsLoading, setModelsLoading] = useState(false)
+    const keyboardInset = useKeyboardOverlapBottom()
+    const [providers, setProviders] = useState(emptyProvidersState)
+    const [visibleKeys, setVisibleKeys] = useState({
+        openai: false,
+        anthropic: false,
+        google: false,
+        mistral: false
+    })
     const [feedback, setFeedback] = useState(null)
     const [theme, setTheme] = useState(() => localStorage.getItem('frugalGptTheme') || 'system')
     const [loading, setLoading] = useState(true)
     const [saving, setSaving] = useState(false)
-    const loadAvailableModels = useCallback(async (currentSelectedModel = 'gpt-5') => {
-        if (!auth.currentUser) return
-        setModelsLoading(true)
-        try {
-            const payload = await chatApi.fetchAvailableModels()
-            const models = payload.models || []
-            setAvailableModels(models)
-            const modelIds = models.map((model) => model.id)
-            if (!modelIds.includes(currentSelectedModel)) {
-                setSelectedModel(payload.defaultModel || 'gpt-5')
-            }
-        } catch (error) {
-            setAvailableModels([])
-            setFeedback({
-                severity: 'warning',
-                message: error.message || 'Could not load model list.'
-            })
-        } finally {
-            setModelsLoading(false)
-        }
-    }, [])
 
     useEffect(() => {
         const fetchUserSettings = async () => {
@@ -55,15 +66,7 @@ function User({ setMode }) {
                 const docSnap = await getDoc(docRef)
                 if (docSnap.exists()) {
                     const userData = docSnap.data()
-                    if (userData.openAi) {
-                        const savedApiKey = userData.openAi.openaiKey || ''
-                        setApiKey(savedApiKey)
-                        const savedModel = userData.openAi.model || 'gpt-5'
-                        setSelectedModel(savedModel)
-                        if (savedApiKey) {
-                            await loadAvailableModels(savedModel)
-                        }
-                    }
+                    setProviders(hydrateProvidersFromDoc(userData))
                 }
             }
             setLoading(false)
@@ -79,20 +82,27 @@ function User({ setMode }) {
         })
 
         return () => unsubscribe()
-    }, [loadAvailableModels])
+    }, [])
 
-    const handleSaveApiSettings = async () => {
+    const handleSaveAll = async () => {
         if (!auth.currentUser) {
             setFeedback({ severity: 'warning', message: 'User not authenticated' })
             return
         }
         setSaving(true)
         try {
+            const providersPayload = {}
+            PROVIDER_CONFIG.forEach(({ id }) => {
+                const row = providers[id]
+                providersPayload[id] = {
+                    apiKey: row.apiKey?.trim() || ''
+                }
+            })
             await setDoc(doc(db, 'users', auth.currentUser.uid), {
-                openAi: { openaiKey: apiKey, model: selectedModel || 'gpt-5' }
+                providers: providersPayload,
+                openAi: deleteField()
             }, { merge: true })
-            setFeedback({ severity: 'success', message: 'OpenAI settings saved.' })
-            await loadAvailableModels(selectedModel || 'gpt-5')
+            setFeedback({ severity: 'success', message: 'API settings saved.' })
         } catch (error) {
             setFeedback({ severity: 'error', message: `Error saving settings: ${error.message}` })
         } finally {
@@ -100,26 +110,37 @@ function User({ setMode }) {
         }
     }
 
-    const handleDeleteApiKey = async () => {
+    const handleDeleteProvider = async (providerId) => {
         if (!auth.currentUser) {
             setFeedback({ severity: 'warning', message: 'User not authenticated' })
             return
         }
         try {
+            const next = {
+                ...providers,
+                [providerId]: { apiKey: '' }
+            }
+            setProviders(next)
+            const providersPayload = {}
+            PROVIDER_CONFIG.forEach(({ id }) => {
+                const row = id === providerId
+                    ? { apiKey: '' }
+                    : providers[id]
+                providersPayload[id] = {
+                    apiKey: row.apiKey?.trim() || ''
+                }
+            })
             await setDoc(doc(db, 'users', auth.currentUser.uid), {
-                openAi: {}
+                providers: providersPayload,
+                openAi: deleteField()
             }, { merge: true })
-            setApiKey('')
-            setSelectedModel('gpt-5')
-            setAvailableModels([])
-            setFeedback({ severity: 'success', message: 'API key deleted.' })
+            setFeedback({ severity: 'success', message: `${providerId} API key removed.` })
         } catch (error) {
-            setFeedback({ severity: 'error', message: `Error deleting API key: ${error.message}` })
+            setFeedback({ severity: 'error', message: error.message })
         }
     }
 
-    const handleThemeChange = (_event, value) => {
-        if (!value) return
+    const handleThemeChange = (value) => {
         setTheme(value)
         setMode(value)
         localStorage.setItem('frugalGptTheme', value)
@@ -127,185 +148,172 @@ function User({ setMode }) {
 
     if (loading) {
         return (
-            <Box
-                sx={{
-                    display: 'flex',
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                    flex: 1,
-                    minHeight: 0,
-                    py: 8,
-                    width: '100%'
-                }}
-            >
-                <CircularProgress size={24} />
-            </Box>
+            <div className="flex flex-1 min-h-0 w-full items-center justify-center py-16">
+                <Loader2 className="h-6 w-6 animate-spin text-brand-500" aria-hidden />
+            </div>
         )
     }
 
     return (
-        <Box
-            sx={{
-                flex: 1,
-                minHeight: 0,
-                overflow: 'auto',
-                width: '100%',
-                maxWidth: '100%',
-                boxSizing: 'border-box'
+        <div
+            className="box-border flex min-h-0 w-full max-w-full flex-1 overflow-auto [-webkit-overflow-scrolling:touch]"
+            style={{
+                scrollPaddingBottom: keyboardInset ? `${keyboardInset + 24}px` : undefined
             }}
         >
-            <Container maxWidth="sm" sx={{ py: { xs: 3, sm: 5 } }}>
-                <Stack spacing={1} sx={{ mb: 4 }}>
-                    <Typography variant="h4" sx={{ fontWeight: 700, letterSpacing: '-0.02em' }}>
+            <div
+                className="mx-auto w-full max-w-lg px-4 pt-8 pb-10 sm:px-6 sm:pt-12"
+                style={{
+                    paddingBottom: keyboardInset > 0 ? `${24 + keyboardInset}px` : undefined
+                }}
+            >
+                <div className="mb-8 space-y-1">
+                    <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white sm:text-3xl">
                         Settings
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                        Manage your appearance and OpenAI API access.
-                    </Typography>
-                </Stack>
+                    </h1>
+                    <p className="text-sm text-slate-600 dark:text-zinc-400">
+                        Appearance and API keys for each provider (stored securely; used server-side).
+                    </p>
+                </div>
 
                 {feedback && (
-                    <Alert
-                        severity={feedback.severity}
-                        onClose={() => setFeedback(null)}
-                        sx={{ mb: 3, borderRadius: 2 }}
+                    <div
+                        className={clsx(
+                            'mb-6 rounded-xl border px-4 py-3 text-sm',
+                            feedback.severity === 'success'
+                            && 'border-emerald-500/30 bg-emerald-500/10 text-emerald-900 dark:text-emerald-100',
+                            feedback.severity === 'warning'
+                            && 'border-amber-500/30 bg-amber-500/10 text-amber-950 dark:text-amber-100',
+                            feedback.severity === 'error'
+                            && 'border-red-500/30 bg-red-500/10 text-red-900 dark:text-red-100'
+                        )}
                     >
-                        {feedback.message}
-                    </Alert>
+                        <div className="flex justify-between gap-2">
+                            <span>{feedback.message}</span>
+                            <button
+                                type="button"
+                                className="shrink-0 text-xs font-medium underline opacity-80 hover:opacity-100"
+                                onClick={() => setFeedback(null)}
+                            >
+                                Dismiss
+                            </button>
+                        </div>
+                    </div>
                 )}
 
-                <Card sx={{ mb: 3 }}>
-                    <CardContent sx={{ p: { xs: 2.5, sm: 3 } }}>
-                        <Typography
-                            variant="overline"
-                            sx={{ color: 'text.secondary', fontWeight: 600 }}
-                        >
-                            Appearance
-                        </Typography>
-                        <Typography variant="h6" sx={{ fontWeight: 600, mb: 0.5 }}>
-                            Theme
-                        </Typography>
-                        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                            Choose how FrugalGPT looks to you.
-                        </Typography>
-                        <ToggleButtonGroup
-                            value={theme}
-                            exclusive
-                            onChange={handleThemeChange}
-                            sx={{
-                                width: '100%',
-                                '& .MuiToggleButton-root': {
-                                    flex: 1,
-                                    gap: 1,
-                                    py: 1.25,
-                                    textTransform: 'none',
-                                    fontWeight: 500
-                                }
-                            }}
-                        >
-                            <ToggleButton value="system">
-                                <SettingsBrightnessRoundedIcon fontSize="small" />
-                                System
-                            </ToggleButton>
-                            <ToggleButton value="light">
-                                <LightModeRoundedIcon fontSize="small" />
-                                Light
-                            </ToggleButton>
-                            <ToggleButton value="dark">
-                                <DarkModeRoundedIcon fontSize="small" />
-                                Dark
-                            </ToggleButton>
-                        </ToggleButtonGroup>
-                    </CardContent>
-                </Card>
-
-                <Card>
-                    <CardContent sx={{ p: { xs: 2.5, sm: 3 } }}>
-                        <Typography
-                            variant="overline"
-                            sx={{ color: 'text.secondary', fontWeight: 600 }}
-                        >
-                            Account
-                        </Typography>
-                        <Typography variant="h6" sx={{ fontWeight: 600, mb: 0.5 }}>
-                            OpenAI API key & model
-                        </Typography>
-                        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                            Your key is stored securely and used server-side for calls.
-                        </Typography>
-                        <TextField
-                            fullWidth
-                            type={showKey ? 'text' : 'password'}
-                            value={apiKey}
-                            onChange={(e) => setApiKey(e.target.value)}
-                            placeholder="sk-..."
-                            InputProps={{
-                                startAdornment: (
-                                    <InputAdornment position="start">
-                                        <KeyRoundedIcon fontSize="small" />
-                                    </InputAdornment>
-                                ),
-                                endAdornment: (
-                                    <InputAdornment position="end">
-                                        <IconButton
-                                            onClick={() => setShowKey((prev) => !prev)}
-                                            edge="end"
-                                            size="small"
-                                        >
-                                            {showKey
-                                                ? <VisibilityOffOutlinedIcon fontSize="small" />
-                                                : <VisibilityOutlinedIcon fontSize="small" />}
-                                        </IconButton>
-                                    </InputAdornment>
-                                )
-                            }}
-                        />
-                        <FormControl
-                            fullWidth
-                            sx={{ mt: 2 }}
-                            disabled={modelsLoading || !apiKey.trim()}
-                        >
-                            <InputLabel id="model-select-label">Model</InputLabel>
-                            <Select
-                                labelId="model-select-label"
-                                label="Model"
-                                value={selectedModel}
-                                onChange={(event) => setSelectedModel(event.target.value)}
-                            >
-                                {availableModels.length === 0 && (
-                                    <MenuItem value="gpt-5">gpt-5</MenuItem>
+                <section className="mb-6 rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm dark:border-white/[0.08] dark:bg-zinc-900">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-zinc-500">
+                        Appearance
+                    </p>
+                    <h2 className="mt-1 text-lg font-semibold text-slate-900 dark:text-white">
+                        Theme
+                    </h2>
+                    <p className="mt-1 text-sm text-slate-600 dark:text-zinc-400">
+                        Choose how FrugalGPT looks to you.
+                    </p>
+                    <div className="mt-4 grid grid-cols-3 gap-2 rounded-xl bg-slate-100/80 p-1 dark:bg-zinc-800">
+                        {[
+                            { id: 'system', icon: Monitor, label: 'System' },
+                            { id: 'light', icon: Sun, label: 'Light' },
+                            { id: 'dark', icon: Moon, label: 'Dark' }
+                        ].map(({ id, icon: Icon, label }) => (
+                            <button
+                                key={id}
+                                type="button"
+                                onClick={() => handleThemeChange(id)}
+                                className={clsx(
+                                    'flex items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-medium transition-colors',
+                                    theme === id
+                                        ? 'bg-white text-slate-900 shadow-sm dark:bg-zinc-700 dark:text-white'
+                                        : 'text-slate-600 hover:text-slate-900 dark:text-zinc-400 dark:hover:text-white'
                                 )}
-                                {availableModels.map((model) => (
-                                    <MenuItem key={model.id} value={model.id}>
-                                        {model.id}
-                                    </MenuItem>
-                                ))}
-                            </Select>
-                        </FormControl>
-                        <Divider sx={{ my: 2.5 }} />
-                        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.25}>
-                            <Button
-                                variant="contained"
-                                onClick={handleSaveApiSettings}
-                                disabled={saving || apiKey.trim() === ''}
-                                sx={{ flex: 1 }}
                             >
-                                {saving ? 'Saving...' : 'Save settings'}
-                            </Button>
-                            <Button
-                                variant="outlined"
-                                color="error"
-                                onClick={handleDeleteApiKey}
-                                disabled={saving || apiKey.trim() === ''}
-                                sx={{ flex: 1 }}
+                                <Icon className="h-4 w-4 shrink-0" aria-hidden />
+                                {label}
+                            </button>
+                        ))}
+                    </div>
+                </section>
+
+                {PROVIDER_CONFIG.map(({ id, label, placeholder }) => (
+                    <section
+                        key={id}
+                        className="mb-6 rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm dark:border-white/[0.08] dark:bg-zinc-900"
+                    >
+                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-zinc-500">
+                            Provider
+                        </p>
+                        <h2 className="mt-1 text-lg font-semibold text-slate-900 dark:text-white">
+                            {label}
+                        </h2>
+                        <p className="mt-1 text-sm text-slate-600 dark:text-zinc-400">
+                            API key used when you choose a model from this provider in chat.
+                        </p>
+
+                        <label className="mt-4 block text-sm font-medium text-slate-700 dark:text-zinc-300">
+                            <span className="block">API key</span>
+                            <div className="relative mt-1.5">
+                                <Key className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                                <input
+                                    type={visibleKeys[id] ? 'text' : 'password'}
+                                    autoComplete="off"
+                                    value={providers[id].apiKey}
+                                    onChange={(e) => setProviders((prev) => ({
+                                        ...prev,
+                                        [id]: { ...prev[id], apiKey: e.target.value }
+                                    }))}
+                                    placeholder={placeholder}
+                                    className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-11 text-[16px] text-slate-900 outline-none ring-brand-500/0 transition placeholder:text-slate-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 dark:border-white/10 dark:bg-zinc-950 dark:text-white sm:text-sm"
+                                />
+                                <button
+                                    type="button"
+                                    className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 dark:hover:bg-zinc-800"
+                                    onClick={() => setVisibleKeys((prev) => ({
+                                        ...prev,
+                                        [id]: !prev[id]
+                                    }))}
+                                    aria-label={visibleKeys[id] ? 'Hide key' : 'Show key'}
+                                >
+                                    {visibleKeys[id]
+                                        ? <EyeOff className="h-4 w-4" />
+                                        : <Eye className="h-4 w-4" />}
+                                </button>
+                            </div>
+                        </label>
+
+                        <div className="mt-4">
+                            <button
+                                type="button"
+                                disabled={
+                                    saving || !providers[id].apiKey?.trim()
+                                }
+                                onClick={() => handleDeleteProvider(id)}
+                                className="w-full rounded-xl border border-red-500/40 px-4 py-2.5 text-sm font-semibold text-red-700 hover:bg-red-500/10 dark:text-red-400 sm:w-auto"
                             >
-                                Delete
-                            </Button>
-                        </Stack>
-                    </CardContent>
-                </Card>
-            </Container>
-        </Box>
+                                Clear
+                                {' '}
+                                {label}
+                            </button>
+                        </div>
+                    </section>
+                ))}
+
+                <div className="sticky bottom-4 z-10 flex justify-center pb-2">
+                    <button
+                        type="button"
+                        disabled={saving}
+                        onClick={handleSaveAll}
+                        className="rounded-full bg-brand-600 px-8 py-3 text-sm font-semibold text-white shadow-lg shadow-brand-600/25 hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                        {saving ? 'Saving…' : 'Save all changes'}
+                    </button>
+                </div>
+
+                <p className="mt-4 text-center text-xs text-slate-500 dark:text-zinc-500">
+                    Keys are merged server-side; clearing a provider removes only that key.
+                </p>
+            </div>
+        </div>
     )
 }
 
