@@ -77,8 +77,9 @@ function App() {
         return () => document.removeEventListener('mousedown', closeOnOutside)
     }, [])
 
-    const handleSettings = () => {
+    const openUserPage = () => {
         setUserMenuOpen(false)
+        closeDrawerOnMobile()
         navigate('/user')
     }
 
@@ -214,7 +215,7 @@ function App() {
                                         type="button"
                                         role="menuitem"
                                         className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-black/5 dark:hover:bg-white/10"
-                                        onClick={handleSettings}
+                                        onClick={openUserPage}
                                     >
                                         <Settings className="h-4 w-4 shrink-0 opacity-70" />
                                         Settings
@@ -235,7 +236,7 @@ function App() {
                     ) : (
                         <button
                             type="button"
-                            onClick={() => navigate('/signin')}
+                            onClick={openUserPage}
                             className={clsx(
                                 'ml-2 inline-flex items-center gap-2 rounded-[10px] px-4 py-2',
                                 'text-sm font-semibold text-white shadow-none',
