@@ -77,12 +77,6 @@ function App() {
         return () => document.removeEventListener('mousedown', closeOnOutside)
     }, [])
 
-    const openUserPage = () => {
-        setUserMenuOpen(false)
-        closeDrawerOnMobile()
-        navigate('/user')
-    }
-
     const handleSignOut = async () => {
         setUserMenuOpen(false)
         auth.signOut()
@@ -104,6 +98,12 @@ function App() {
             setOpen(false)
             localStorage.setItem('frugalGptSidenav', 'false')
         }
+    }
+
+    const openUserPage = () => {
+        setUserMenuOpen(false)
+        closeDrawerOnMobile()
+        navigate('/user')
     }
 
     const handleNewChat = () => {
@@ -237,15 +237,20 @@ function App() {
                         <button
                             type="button"
                             onClick={openUserPage}
+                            aria-label="Sign in"
                             className={clsx(
-                                'ml-2 inline-flex items-center gap-2 rounded-[10px] px-4 py-2',
-                                'text-sm font-semibold text-white shadow-none',
-                                'bg-gradient-to-br from-emerald-700 via-emerald-500 to-emerald-400',
-                                'hover:brightness-105'
+                                isMobile
+                                    ? 'rounded-lg p-2 text-inherit hover:bg-black/5 dark:hover:bg-white/10'
+                                    : [
+                                        'ml-2 inline-flex items-center gap-2 rounded-[10px] px-4 py-2',
+                                        'text-sm font-semibold text-white shadow-none',
+                                        'bg-gradient-to-br from-emerald-700 via-emerald-500 to-emerald-400',
+                                        'hover:brightness-105'
+                                    ]
                             )}
                         >
-                            <LogIn className="h-4 w-4" />
-                            Sign in
+                            <LogIn className={isMobile ? 'h-6 w-6' : 'h-4 w-4'} />
+                            {!isMobile && 'Sign in'}
                         </button>
                     )}
                 </div>
