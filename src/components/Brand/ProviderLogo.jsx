@@ -52,7 +52,19 @@ function ProviderLogo({
     }
 
     if (provider === 'anthropic') {
-        return <SimpleIconBrand icon={siAnthropic} size={size} className={cn} />
+        return (
+            <svg
+                role="img"
+                viewBox="0 0 24 24"
+                width={size}
+                height={size}
+                className={clsx(cn, 'text-slate-900 dark:text-white')}
+                aria-hidden
+                xmlns="http://www.w3.org/2000/svg"
+            >
+                <path fill="currentColor" d={siAnthropic.path} />
+            </svg>
+        )
     }
 
     if (provider === 'google') {
