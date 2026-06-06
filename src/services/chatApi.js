@@ -5,8 +5,10 @@ import { auth, db } from './firebase'
 import { buildAttachmentParts } from '../utils/attachmentParts'
 
 const createNameForChat = async (titleSeed) => {
-    if (!titleSeed || typeof titleSeed !== 'string' || !titleSeed.trim()) return null
-    return `Chat-${Date.now()}`
+    if (!titleSeed || typeof titleSeed !== 'string' || !titleSeed.trim()) return 'New chat'
+    const trimmed = titleSeed.trim().replace(/\s+/g, ' ')
+    if (trimmed.length <= 48) return trimmed
+    return `${trimmed.slice(0, 45)}…`
 }
 
 const toOpenAiMessages = (messages) => messages

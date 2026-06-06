@@ -12,6 +12,7 @@ const openaiProvider = require('./providers/openaiProvider')
 const anthropicProvider = require('./providers/anthropicProvider')
 const geminiProvider = require('./providers/geminiProvider')
 const mistralProvider = require('./providers/mistralProvider')
+const { generateChatTitle } = require('./providers/chatTitle')
 
 admin.initializeApp()
 
@@ -232,7 +233,18 @@ exports.generateChatResponseStreamHttp = onRequest(
                 userData: userDoc.data() || {}
             })
 
-            res.write(`${JSON.stringify({ type: 'done', ...result })}\n`)
+            let title = result.title || null
+            if (!title) {
+                title = await generateChatTitle({
+                    provider,
+                    apiKey,
+                    modelId: selectedModel,
+                    messages: pipelineMessages,
+                    assistantResponse: result.assistantResponse
+                })
+            }
+
+            res.write(`${JSON.stringify({ type: 'done', ...result, title })}\n`)
             res.end()
         } catch (error) {
             console.error('generateChatResponseStreamHttp failed:', error)

@@ -551,7 +551,7 @@ function Chat({ currentChat }) {
             <div
                 className={clsx(
                     'relative flex shrink-0 flex-col items-center',
-                    'bg-gradient-to-t from-[#f7f7f8] from-60% to-transparent',
+                    'bg-gradient-to-t from-[#f7f7f8] from-45% to-transparent',
                     'dark:from-[#0b0b0f] dark:to-transparent',
                     'pl-[max(12px,env(safe-area-inset-left,0px))] pr-[max(12px,env(safe-area-inset-right,0px))]',
                     'sm:pl-[max(24px,env(safe-area-inset-left,0px))] sm:pr-[max(24px,env(safe-area-inset-right,0px))]',
@@ -564,15 +564,17 @@ function Chat({ currentChat }) {
                 }}
             >
                 {showJumpLatest && (
-                    <div className={clsx('relative mb-2 flex w-full justify-end', composerWidth)}>
-                        <button
-                            type="button"
-                            onClick={scrollToLatest}
-                            className="inline-flex items-center gap-1 rounded-full border border-slate-200/90 bg-white/95 px-3 py-1.5 text-xs font-semibold text-slate-800 shadow-md backdrop-blur dark:border-white/[0.12] dark:bg-zinc-900/95 dark:text-zinc-100"
-                        >
-                            Latest
-                            <ChevronDown className="h-4 w-4" aria-hidden />
-                        </button>
+                    <div className="pointer-events-none absolute inset-x-0 -top-11 z-20 flex justify-center px-4 sm:px-6">
+                        <div className={clsx(composerWidth, 'flex justify-end')}>
+                            <button
+                                type="button"
+                                onClick={scrollToLatest}
+                                className="pointer-events-auto inline-flex items-center gap-1 rounded-full border border-slate-200/90 bg-white/95 px-3 py-1.5 text-xs font-semibold text-slate-800 shadow-lg backdrop-blur-sm dark:border-white/[0.12] dark:bg-zinc-900/90 dark:text-zinc-100"
+                            >
+                                Latest
+                                <ChevronDown className="h-4 w-4" aria-hidden />
+                            </button>
+                        </div>
                     </div>
                 )}
 
