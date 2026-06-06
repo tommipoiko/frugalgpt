@@ -34,13 +34,23 @@ const streamReply = async ({
     })
 
     let fullText = ''
+    let searchStatusSent = false
     for await (const chunk of stream) {
-        const parts = chunk.candidates?.[0]?.content?.parts ?? []
+        const candidate = chunk.candidates?.[0]
+        const parts = candidate?.content?.parts ?? []
+        if (
+            webSearchEnabled
+            && !searchStatusSent
+            && candidate?.groundingMetadata?.webSearchQueries?.length
+        ) {
+            searchStatusSent = true
+            if (onStatus) onStatus({ state: 'searching', message: 'Searching the web...' })
+        }
         for (const part of parts) {
             if (!part?.text) continue
             if (part.thought) {
                 if (onReasoningDelta) onReasoningDelta(part.text)
-                if (onStatus) onStatus({ state: 'thinking', message: 'Reasoning...' })
+                if (onStatus) onStatus({ state: 'reasoning', message: 'Reasoning...' })
             } else {
                 fullText += part.text
                 onDelta(part.text)
@@ -49,7 +59,6 @@ const streamReply = async ({
         }
         if (webSearchEnabled) {
             collectSourcesFromUnknown(chunk, recordSource)
-            if (onStatus) onStatus({ state: 'searching', message: 'Searching the web...' })
         }
     }
 

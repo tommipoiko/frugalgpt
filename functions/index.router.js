@@ -120,7 +120,9 @@ const streamResponseToNdjson = async ({
     attachmentParts,
     apiKey,
     reasoningEnabled,
-    webSearchEnabled
+    webSearchEnabled,
+    userId,
+    userData
 }) => adapter.streamReply({
     messages,
     attachmentParts,
@@ -128,6 +130,9 @@ const streamResponseToNdjson = async ({
     modelId: selectedModel,
     reasoningEnabled,
     webSearchEnabled,
+    userId,
+    db: admin.firestore(),
+    userData,
     onDelta: (delta) => {
         res.write(`${JSON.stringify({ type: 'delta', delta })}\n`)
     },
@@ -222,7 +227,9 @@ exports.generateChatResponseStreamHttp = onRequest(
                 attachmentParts: provider === 'openai' ? attachmentParts : [],
                 apiKey,
                 reasoningEnabled: effectiveReasoning,
-                webSearchEnabled: effectiveWebSearch
+                webSearchEnabled: effectiveWebSearch,
+                userId,
+                userData: userDoc.data() || {}
             })
 
             res.write(`${JSON.stringify({ type: 'done', ...result })}\n`)

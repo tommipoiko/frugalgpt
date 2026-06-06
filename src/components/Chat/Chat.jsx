@@ -60,8 +60,7 @@ function Chat({ currentChat }) {
     const [canSendMessages, setCanSendMessages] = useState(false)
     const [isSendingMessage, setIsSendingMessage] = useState(false)
     const [sendError, setSendError] = useState('')
-    const [reasoningPreview, setReasoningPreview] = useState('')
-    const [statusPreview, setStatusPreview] = useState('')
+    const [activityState, setActivityState] = useState(null)
     const [chatName, setChatName] = useState('')
     const [userSettings, setUserSettings] = useState(null)
     const userSettingsRef = useRef(null)
@@ -356,8 +355,7 @@ function Chat({ currentChat }) {
         const persistW = persistWebForDoc(selectedEntry, webSearchEnabled)
 
         setSendError('')
-        setReasoningPreview('')
-        setStatusPreview('Preparing response...')
+        setActivityState('thinking')
         setIsSendingMessage(true)
         const preparedAttachments = [...attachments]
         const outgoingMessage = currentMessage
@@ -398,6 +396,9 @@ function Chat({ currentChat }) {
                 messages,
                 id || currentChat,
                 (partialAssistantText) => {
+                    if (partialAssistantText.trim()) {
+                        setActivityState(null)
+                    }
                     setMessages((prev) => prev.map((msg) => {
                         if (msg.id === streamingAssistantMessageId) {
                             return { ...msg, content: partialAssistantText }
@@ -405,9 +406,7 @@ function Chat({ currentChat }) {
                         return msg
                     }))
                 },
-                (reasoningDelta) => {
-                    setReasoningPreview(reasoningDelta)
-                },
+                () => {},
                 (sources) => {
                     setMessages((prev) => prev.map((msg) => {
                         if (msg.id === streamingAssistantMessageId) {
@@ -417,7 +416,17 @@ function Chat({ currentChat }) {
                     }))
                 },
                 (status) => {
-                    setStatusPreview(status.message || '')
+                    if (status.state === 'responding' || status.state === 'done') {
+                        setActivityState(null)
+                        return
+                    }
+                    if (status.state === 'searching') {
+                        setActivityState('searching')
+                    } else if (status.state === 'reasoning') {
+                        setActivityState('reasoning')
+                    } else if (status.state === 'thinking') {
+                        setActivityState('thinking')
+                    }
                 },
                 {
                     provider: selectedEntry.provider,
@@ -436,15 +445,13 @@ function Chat({ currentChat }) {
                 if (a.previewUrl) URL.revokeObjectURL(a.previewUrl)
             })
             setMessages(finalMessages)
-            setReasoningPreview('')
-            setStatusPreview('')
+            setActivityState(null)
             if (!id && chatId) {
                 navigate(`/chats/${chatId}`, { replace: true })
             }
         } catch (error) {
             setSendError(error.message || 'Failed to send message. Please try again.')
-            setReasoningPreview('')
-            setStatusPreview('')
+            setActivityState(null)
             setMessages(messages)
             setCurrentMessage(outgoingMessage)
             setAttachments(preparedAttachments)
@@ -525,9 +532,9 @@ function Chat({ currentChat }) {
                         </div>
                     ))}
 
-                    {(reasoningPreview || statusPreview) && (
+                    {activityState && (
                         <div className="flex justify-start">
-                            <ThinkingIndicator text={reasoningPreview || statusPreview} />
+                            <ThinkingIndicator state={activityState} />
                         </div>
                     )}
 

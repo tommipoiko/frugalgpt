@@ -84,6 +84,32 @@ function User({ setMode }) {
         return () => unsubscribe()
     }, [])
 
+    const buildProvidersPayload = async () => {
+        const docRef = doc(db, 'users', auth.currentUser.uid)
+        const docSnap = await getDoc(docRef)
+        const existingProviders = docSnap.exists() ? docSnap.data()?.providers : null
+        const prevMistralKey = existingProviders?.mistral?.apiKey?.trim() || ''
+        const nextMistralKey = providers.mistral.apiKey?.trim() || ''
+        const providersPayload = {}
+
+        PROVIDER_CONFIG.forEach(({ id }) => {
+            const row = providers[id]
+            const payload = {
+                apiKey: row.apiKey?.trim() || ''
+            }
+            if (
+                id === 'mistral'
+                && prevMistralKey === nextMistralKey
+                && existingProviders?.mistral?.webSearchAgents
+            ) {
+                payload.webSearchAgents = existingProviders.mistral.webSearchAgents
+            }
+            providersPayload[id] = payload
+        })
+
+        return providersPayload
+    }
+
     const handleSaveAll = async () => {
         if (!auth.currentUser) {
             setFeedback({ severity: 'warning', message: 'User not authenticated' })
@@ -91,13 +117,7 @@ function User({ setMode }) {
         }
         setSaving(true)
         try {
-            const providersPayload = {}
-            PROVIDER_CONFIG.forEach(({ id }) => {
-                const row = providers[id]
-                providersPayload[id] = {
-                    apiKey: row.apiKey?.trim() || ''
-                }
-            })
+            const providersPayload = await buildProvidersPayload()
             await setDoc(doc(db, 'users', auth.currentUser.uid), {
                 providers: providersPayload,
                 openAi: deleteField()
@@ -121,15 +141,8 @@ function User({ setMode }) {
                 [providerId]: { apiKey: '' }
             }
             setProviders(next)
-            const providersPayload = {}
-            PROVIDER_CONFIG.forEach(({ id }) => {
-                const row = id === providerId
-                    ? { apiKey: '' }
-                    : providers[id]
-                providersPayload[id] = {
-                    apiKey: row.apiKey?.trim() || ''
-                }
-            })
+            const providersPayload = await buildProvidersPayload()
+            providersPayload[providerId] = { apiKey: '' }
             await setDoc(doc(db, 'users', auth.currentUser.uid), {
                 providers: providersPayload,
                 openAi: deleteField()

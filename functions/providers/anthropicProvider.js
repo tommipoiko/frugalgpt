@@ -51,10 +51,20 @@ const streamReply = async ({
 
     let fullText = ''
     for await (const event of stream) {
+        if (event.type === 'content_block_start') {
+            const block = event.content_block
+            if (
+                webSearchEnabled
+                && block?.type === 'server_tool_use'
+                && block?.name === 'web_search'
+            ) {
+                if (onStatus) onStatus({ state: 'searching', message: 'Searching the web...' })
+            }
+        }
         if (event.type === 'content_block_delta') {
             if (event.delta?.type === 'thinking_delta' && event.delta.thinking) {
                 if (onReasoningDelta) onReasoningDelta(event.delta.thinking)
-                if (onStatus) onStatus({ state: 'thinking', message: 'Reasoning...' })
+                if (onStatus) onStatus({ state: 'reasoning', message: 'Reasoning...' })
             } else if (event.delta?.type === 'text_delta' && event.delta.text) {
                 fullText += event.delta.text
                 onDelta(event.delta.text)

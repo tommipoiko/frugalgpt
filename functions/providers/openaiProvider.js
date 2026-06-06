@@ -50,7 +50,7 @@ const streamReply = async ({
             && event.delta
         ) {
             if (onReasoningDelta) onReasoningDelta(event.delta)
-            if (onStatus) onStatus({ state: 'thinking', message: 'Reasoning...' })
+            if (onStatus) onStatus({ state: 'reasoning', message: 'Reasoning...' })
         } else if (event.type?.includes('web_search')) {
             if (onStatus) onStatus({ state: 'searching', message: 'Searching the web...' })
         } else if (

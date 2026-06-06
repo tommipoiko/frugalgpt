@@ -114,17 +114,25 @@ const parseSseDataLines = async (responseBody, onJson) => {
         const lines = buffer.split('\n')
         buffer = lines.pop() || ''
         for (const line of lines) {
-            const trimmed = line.trim()
-            if (!trimmed.startsWith('data:')) continue
-            const data = trimmed.slice(5).trim()
-            if (data === '[DONE]' || !data) continue
-            try {
-                const json = JSON.parse(data)
-                onJson(json)
-            } catch {
-                // ignore partial JSON chunks
-            }
+            parseSseLine(line, onJson)
         }
+    }
+
+    if (buffer.trim()) {
+        parseSseLine(buffer, onJson)
+    }
+}
+
+const parseSseLine = (line, onJson) => {
+    const trimmed = line.trim()
+    if (!trimmed.startsWith('data:')) return
+    const data = trimmed.slice(5).trim()
+    if (data === '[DONE]' || !data) return
+    try {
+        const json = JSON.parse(data)
+        onJson(json)
+    } catch {
+        // ignore partial JSON chunks
     }
 }
 
