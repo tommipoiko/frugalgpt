@@ -281,7 +281,7 @@ function App() {
                 {isMobile && (
                     <aside
                         className={clsx(
-                            'fixed inset-0 z-[1250] flex w-screen flex-col overflow-hidden',
+                            'fixed inset-0 z-[1250] flex w-full max-w-full flex-col overflow-x-hidden overflow-y-hidden overscroll-x-none',
                             'border-r border-slate-200/60 bg-[#fafafb] shadow-xl transition-transform duration-200 ease-out',
                             'dark:border-white/[0.06] dark:bg-[#0e0e13]',
                             open ? 'translate-x-0' : '-translate-x-full pointer-events-none'

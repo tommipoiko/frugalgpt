@@ -1,4 +1,6 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, {
+    useEffect, useMemo, useRef, useState
+} from 'react'
 import {
     Plus,
     MessageCircle,
@@ -40,6 +42,8 @@ const groupChatsByRecency = (chats) => {
     return Object.entries(groups).filter(([, items]) => items.length > 0)
 }
 
+const TAP_MOVE_THRESHOLD_PX = 10
+
 function Sidenav({ user, onNavigateChat, currentChatId }) {
     const [chats, setChats] = useState([])
     const [selectedChat, setSelectedChat] = useState(null)
@@ -53,6 +57,52 @@ function Sidenav({ user, onNavigateChat, currentChatId }) {
     const [openRenameDialog, setOpenRenameDialog] = useState(false)
     const [openShareDialog, setOpenShareDialog] = useState(false)
     const [shareChatLink, setShareChatLink] = useState('')
+    const touchStartRef = useRef(null)
+    const suppressRowClickRef = useRef(false)
+
+    const handleRowTouchStart = (event) => {
+        const touch = event.touches[0]
+        if (!touch) return
+        touchStartRef.current = { x: touch.clientX, y: touch.clientY }
+        suppressRowClickRef.current = false
+    }
+
+    const handleRowTouchMove = (event) => {
+        const start = touchStartRef.current
+        const touch = event.touches[0]
+        if (!start || !touch) return
+
+        const dx = Math.abs(touch.clientX - start.x)
+        const dy = Math.abs(touch.clientY - start.y)
+        if (dx > TAP_MOVE_THRESHOLD_PX || dy > TAP_MOVE_THRESHOLD_PX) {
+            suppressRowClickRef.current = true
+        }
+    }
+
+    const handleRowTouchEnd = (chatId) => (event) => {
+        const start = touchStartRef.current
+        const touch = event.changedTouches[0]
+        touchStartRef.current = null
+        if (!start || !touch) return
+
+        const dx = Math.abs(touch.clientX - start.x)
+        const dy = Math.abs(touch.clientY - start.y)
+        if (dx > TAP_MOVE_THRESHOLD_PX || dy > TAP_MOVE_THRESHOLD_PX) {
+            suppressRowClickRef.current = true
+            return
+        }
+
+        event.preventDefault()
+        onNavigateChat(chatId)
+    }
+
+    const handleRowClick = (chatId) => () => {
+        if (suppressRowClickRef.current) {
+            suppressRowClickRef.current = false
+            return
+        }
+        onNavigateChat(chatId)
+    }
 
     useEffect(() => {
         if (!user) {
@@ -160,10 +210,6 @@ function Sidenav({ user, onNavigateChat, currentChatId }) {
         setOpenShareDialog(false)
     }
 
-    const handleChatActivate = (chatId) => {
-        onNavigateChat(chatId)
-    }
-
     const renderChatRow = (chat) => {
         const isSelected = currentChatId === chat.id
         return (
@@ -171,13 +217,12 @@ function Sidenav({ user, onNavigateChat, currentChatId }) {
                 <div className="relative flex items-center">
                     <button
                         type="button"
-                        onClick={() => handleChatActivate(chat.id)}
-                        onTouchEnd={(event) => {
-                            event.preventDefault()
-                            handleChatActivate(chat.id)
-                        }}
+                        onTouchStart={handleRowTouchStart}
+                        onTouchMove={handleRowTouchMove}
+                        onTouchEnd={handleRowTouchEnd(chat.id)}
+                        onClick={handleRowClick(chat.id)}
                         className={clsx(
-                            'flex flex-1 items-center gap-2 rounded-[10px] py-1.5 pl-2 pr-10 text-left text-sm',
+                            'flex min-w-0 flex-1 touch-pan-y items-center gap-2 rounded-[10px] py-1.5 pl-2 pr-10 text-left text-sm',
                             isSelected
                                 ? 'bg-emerald-500/[0.14] font-semibold dark:bg-emerald-400/[0.14]'
                                 : 'font-medium hover:bg-black/[0.04] dark:hover:bg-white/[0.06]'
@@ -226,7 +271,7 @@ function Sidenav({ user, onNavigateChat, currentChatId }) {
                 </button>
             </div>
             <div className="mx-4 h-px shrink-0 bg-slate-200/80 dark:bg-white/[0.06]" />
-            <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain pb-4 pt-2 [-webkit-overflow-scrolling:touch]">
+            <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-x-none overscroll-y-contain touch-pan-y pb-4 pt-2 [-webkit-overflow-scrolling:touch]">
                 {chats.length === 0 ? (
                     <div className="px-4 py-8 text-center text-sm text-slate-500 dark:text-zinc-400">
                         Your chats will appear here.
