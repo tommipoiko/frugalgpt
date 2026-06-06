@@ -210,8 +210,8 @@ function Sidenav({ user, onNavigateChat, currentChatId }) {
     const modalBackdrop = 'fixed inset-0 z-[1400] flex items-center justify-center bg-black/50 p-4'
 
     return (
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-            <div className="px-4 pb-3">
+        <div className="flex h-full min-h-0 flex-col overflow-hidden">
+            <div className="shrink-0 px-4 pb-3">
                 <button
                     type="button"
                     onClick={() => onNavigateChat('new')}
@@ -225,8 +225,8 @@ function Sidenav({ user, onNavigateChat, currentChatId }) {
                     New chat
                 </button>
             </div>
-            <div className="mx-4 h-px bg-slate-200/80 dark:bg-white/[0.06]" />
-            <div className="min-h-0 flex-1 overflow-y-auto pb-4 pt-2">
+            <div className="mx-4 h-px shrink-0 bg-slate-200/80 dark:bg-white/[0.06]" />
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain pb-4 pt-2 [-webkit-overflow-scrolling:touch]">
                 {chats.length === 0 ? (
                     <div className="px-4 py-8 text-center text-sm text-slate-500 dark:text-zinc-400">
                         Your chats will appear here.

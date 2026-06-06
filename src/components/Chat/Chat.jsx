@@ -25,6 +25,7 @@ import {
 } from '../../constants/availableModels'
 
 const MAX_ATTACHMENT_SLOTS = 5
+const COMPOSER_MAX_HEIGHT = 240
 
 function hasProviderKey(data, pid) {
     if (!data) return false
@@ -242,6 +243,17 @@ function Chat({ currentChat }) {
             listRef.current.scrollTop = listRef.current.scrollHeight
         }
     }, [messages, autoScrollEnabled])
+
+    const syncComposerHeight = () => {
+        const el = composerRef.current
+        if (!el) return
+        el.style.height = 'auto'
+        el.style.height = `${Math.min(el.scrollHeight, COMPOSER_MAX_HEIGHT)}px`
+    }
+
+    useEffect(() => {
+        syncComposerHeight()
+    }, [currentMessage])
 
     const effectiveReasoningRequest = apiReasoningForRequest(selectedEntry, reasoningEnabled)
     const effectiveWebRequest = apiWebForRequest(selectedEntry, webSearchEnabled)
@@ -603,41 +615,12 @@ function Chat({ currentChat }) {
                             )}
 
                             <form
-                                className="flex items-center gap-2 rounded-[24px] border border-slate-200/90 bg-white p-2 shadow-lg shadow-slate-900/5 transition focus-within:border-brand-500 focus-within:ring-2 focus-within:ring-brand-500/20 dark:border-white/[0.10] dark:bg-zinc-900 dark:shadow-black/40"
+                                className="flex flex-col gap-2 rounded-[24px] border border-slate-200/90 bg-white p-2 shadow-lg shadow-slate-900/5 transition focus-within:border-brand-500 focus-within:ring-2 focus-within:ring-brand-500/20 min-[600px]:flex-row min-[600px]:items-end min-[600px]:gap-2 dark:border-white/[0.10] dark:bg-zinc-900 dark:shadow-black/40"
                                 onSubmit={(e) => {
                                     e.preventDefault()
                                     handleSendMessage()
                                 }}
                             >
-                                <label
-                                    htmlFor="chat-attach-input"
-                                    className="flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-xl text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:text-zinc-400 dark:hover:bg-white/[0.06] dark:hover:text-zinc-200"
-                                >
-                                    <Paperclip className="h-[18px] w-[18px]" aria-hidden />
-                                    <input
-                                        ref={fileInputRef}
-                                        id="chat-attach-input"
-                                        type="file"
-                                        multiple
-                                        className="hidden"
-                                        onChange={handleAttachFile}
-                                        disabled={
-                                            !canSendMessages
-                                            || isSendingMessage
-                                            || attachments.length >= MAX_ATTACHMENT_SLOTS
-                                        }
-                                    />
-                                </label>
-                                <button
-                                    type="button"
-                                    onClick={() => setModelSheetOpen(true)}
-                                    aria-label={modelSelectorLabel}
-                                    title={modelSelectorLabel}
-                                    className="group relative flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-slate-200/80 bg-white text-slate-800 shadow-sm transition hover:-translate-y-[1px] hover:bg-slate-50 hover:shadow dark:border-white/[0.10] dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800"
-                                >
-                                    <ProviderLogo provider={provider} size={20} />
-                                    <span className="pointer-events-none absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border border-white bg-brand-500 dark:border-zinc-900" />
-                                </button>
                                 <textarea
                                     ref={composerRef}
                                     rows={1}
@@ -646,23 +629,56 @@ function Chat({ currentChat }) {
                                     onChange={(e) => setCurrentMessage(e.target.value)}
                                     onKeyDown={handleKeyDown}
                                     disabled={!canSendMessages}
-                                    className="max-h-[240px] min-h-[44px] min-w-0 flex-1 resize-none border-0 bg-transparent px-1 py-2.5 text-[max(16px,0.95rem)] leading-relaxed text-slate-900 outline-none placeholder:text-slate-400 dark:text-zinc-100 dark:placeholder:text-zinc-500"
+                                    className="order-1 max-h-[240px] min-h-[44px] w-full min-w-0 resize-none overflow-y-auto border-0 bg-transparent px-2 py-2.5 text-[max(16px,0.95rem)] leading-relaxed text-slate-900 outline-none placeholder:text-slate-400 min-[600px]:order-3 min-[600px]:flex-1 min-[600px]:px-1 dark:text-zinc-100 dark:placeholder:text-zinc-500"
                                 />
-                                <button
-                                    type="submit"
-                                    disabled={
-                                        !canSendMessages
-                                        || isSendingMessage
-                                        || (currentMessage.trim() === ''
-                                            && attachments.length === 0)
-                                    }
-                                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-brand-600 to-brand-400 text-white shadow-md shadow-brand-500/25 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:bg-none disabled:text-slate-400 disabled:shadow-none dark:disabled:bg-zinc-800 dark:disabled:text-zinc-600"
-                                    title={isSendingMessage ? 'Generating…' : 'Send'}
-                                >
-                                    {isSendingMessage
-                                        ? <Square className="h-4 w-4 fill-current" />
-                                        : <ArrowUp className="h-4 w-4" />}
-                                </button>
+                                <div className="order-2 flex w-full items-center justify-between gap-2 min-[600px]:contents">
+                                    <div className="flex items-center gap-1 min-[600px]:contents">
+                                        <label
+                                            htmlFor="chat-attach-input"
+                                            className="flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-xl text-slate-500 hover:bg-slate-100 hover:text-slate-700 min-[600px]:order-1 dark:text-zinc-400 dark:hover:bg-white/[0.06] dark:hover:text-zinc-200"
+                                        >
+                                            <Paperclip className="h-[18px] w-[18px]" aria-hidden />
+                                            <input
+                                                ref={fileInputRef}
+                                                id="chat-attach-input"
+                                                type="file"
+                                                multiple
+                                                className="hidden"
+                                                onChange={handleAttachFile}
+                                                disabled={
+                                                    !canSendMessages
+                                                    || isSendingMessage
+                                                    || attachments.length >= MAX_ATTACHMENT_SLOTS
+                                                }
+                                            />
+                                        </label>
+                                        <button
+                                            type="button"
+                                            onClick={() => setModelSheetOpen(true)}
+                                            aria-label={modelSelectorLabel}
+                                            title={modelSelectorLabel}
+                                            className="group relative flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-slate-200/80 bg-white text-slate-800 shadow-sm transition hover:-translate-y-[1px] hover:bg-slate-50 hover:shadow min-[600px]:order-2 dark:border-white/[0.10] dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800"
+                                        >
+                                            <ProviderLogo provider={provider} size={20} />
+                                            <span className="pointer-events-none absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border border-white bg-brand-500 dark:border-zinc-900" />
+                                        </button>
+                                    </div>
+                                    <button
+                                        type="submit"
+                                        disabled={
+                                            !canSendMessages
+                                            || isSendingMessage
+                                            || (currentMessage.trim() === ''
+                                                && attachments.length === 0)
+                                        }
+                                        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-brand-600 to-brand-400 text-white shadow-md shadow-brand-500/25 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:bg-none disabled:text-slate-400 disabled:shadow-none min-[600px]:order-4 dark:disabled:bg-zinc-800 dark:disabled:text-zinc-600"
+                                        title={isSendingMessage ? 'Generating…' : 'Send'}
+                                    >
+                                        {isSendingMessage
+                                            ? <Square className="h-4 w-4 fill-current" />
+                                            : <ArrowUp className="h-4 w-4" />}
+                                    </button>
+                                </div>
                             </form>
                         </>
                     ) : (
