@@ -6,12 +6,25 @@ const {
     isAllowedModel,
     sanitizeModelId
 } = require('./modelCatalog')
+const { catalog } = require('./loadModels')
 
 test('model catalog contains exactly required provider models', () => {
-    assert.deepEqual(listRequiredModelsForProvider('openai'), ['gpt-5.5', 'gpt-5.4'])
-    assert.deepEqual(listRequiredModelsForProvider('google'), ['gemini-3.1-pro-preview'])
-    assert.deepEqual(listRequiredModelsForProvider('anthropic'), ['claude-opus-4-7', 'claude-sonnet-4-6'])
-    assert.deepEqual(listRequiredModelsForProvider('mistral'), ['magistral-medium-latest', 'magistral-small-latest'])
+    assert.deepEqual(
+        listRequiredModelsForProvider('openai'),
+        catalog.providers.openai.models.map((model) => model.id)
+    )
+    assert.deepEqual(
+        listRequiredModelsForProvider('google'),
+        catalog.providers.google.models.map((model) => model.id)
+    )
+    assert.deepEqual(
+        listRequiredModelsForProvider('anthropic'),
+        catalog.providers.anthropic.models.map((model) => model.id)
+    )
+    assert.deepEqual(
+        listRequiredModelsForProvider('mistral'),
+        catalog.providers.mistral.models.map((model) => model.id)
+    )
 })
 
 test('sanitizeModelId enforces strict allowed set per provider', () => {
@@ -22,7 +35,7 @@ test('sanitizeModelId enforces strict allowed set per provider', () => {
 })
 
 test('isAllowedModel is true only for required model ids', () => {
-    assert.equal(isAllowedModel('anthropic', 'claude-opus-4-7'), true)
+    assert.equal(isAllowedModel('anthropic', 'claude-opus-4-8'), true)
     assert.equal(isAllowedModel('anthropic', 'claude-sonnet-4-20250514'), false)
     assert.equal(isAllowedModel('mistral', 'magistral-small-latest'), true)
     assert.equal(isAllowedModel('mistral', 'magistral-medium-latest'), true)

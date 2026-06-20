@@ -39,6 +39,7 @@ const streamReply = async ({
     })
 
     let fullText = ''
+    let usage = null
     for await (const event of stream) {
         if (event.type === 'response.output_text.delta' && event.delta) {
             fullText += event.delta
@@ -58,8 +59,21 @@ const streamReply = async ({
             && event.annotation?.type === 'url_citation'
         ) {
             recordSource(event.annotation)
-        } else if (event.type === 'response.completed' && event.response?.output) {
-            event.response.output.forEach((item) => {
+        } else if (event.type === 'response.completed' && event.response) {
+            if (event.response.usage) {
+                let webSearchCalls = 0
+                event.response.output?.forEach?.((item) => {
+                    if (item?.type === 'web_search_call') {
+                        webSearchCalls += 1
+                    }
+                })
+                usage = {
+                    ...event.response.usage,
+                    web_search_calls: webSearchCalls,
+                    estimated: false
+                }
+            }
+            event.response.output?.forEach?.((item) => {
                 item?.content?.forEach?.((part) => {
                     part?.annotations?.forEach?.((annotation) => {
                         if (annotation?.type === 'url_citation') {
@@ -72,7 +86,12 @@ const streamReply = async ({
     }
 
     if (!fullText.trim()) throw new Error('No response received from OpenAI.')
-    return { assistantResponse: fullText, title: null, sources: collectedSources }
+    return {
+        assistantResponse: fullText,
+        title: null,
+        sources: collectedSources,
+        usage
+    }
 }
 
 const listModels = async ({ inferCapabilities }) => listRequiredModelsForProvider(providerId)

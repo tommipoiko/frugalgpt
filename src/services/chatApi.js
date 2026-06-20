@@ -3,6 +3,8 @@ import {
 } from 'firebase/firestore'
 import { auth, db } from './firebase'
 import { buildAttachmentParts } from '../utils/attachmentParts'
+import { sumChatCostUsd } from '../utils/chatCost'
+import { computeTurnCost } from '../utils/usageCost'
 
 const createNameForChat = async (titleSeed) => {
     if (!titleSeed || typeof titleSeed !== 'string' || !titleSeed.trim()) return 'New chat'
@@ -132,6 +134,10 @@ const sendMessage = async (
     let assistantResponse = ''
     let generatedTitle = null
     let streamErrorMessage = ''
+    let turnUsage = null
+    let turnCostUsd = null
+    let turnCostSource = null
+    let turnCostBreakdown = null
     const collectedSources = []
     const seenSourceUrls = new Set()
     const addSource = (source) => {
@@ -171,6 +177,24 @@ const sendMessage = async (
         if (event.type === 'done') {
             generatedTitle = event.title || null
             assistantResponse = event.assistantResponse || assistantResponse
+            turnUsage = event.usage || null
+            turnCostUsd = typeof event.costUsd === 'number' ? event.costUsd : null
+            turnCostSource = typeof event.costSource === 'string' ? event.costSource : null
+            turnCostBreakdown = event.costBreakdown && typeof event.costBreakdown === 'object'
+                ? event.costBreakdown
+                : null
+            if (turnCostUsd === null && turnUsage) {
+                const costResult = computeTurnCost(
+                    event.provider || provider,
+                    event.model || model || modelKey,
+                    turnUsage,
+                    conversation,
+                    assistantResponse
+                )
+                turnCostUsd = typeof costResult.costUsd === 'number' ? costResult.costUsd : null
+                turnCostSource = turnCostSource || costResult.costSource
+                turnCostBreakdown = turnCostBreakdown || costResult.costBreakdown
+            }
             if (Array.isArray(event.sources)) {
                 event.sources.forEach(addSource)
             }
@@ -222,7 +246,15 @@ const sendMessage = async (
         id: Date.now() + 1,
         role: 'system',
         content: assistantResponse,
-        sources: collectedSources
+        sources: collectedSources,
+        ...(turnUsage ? { usage: turnUsage } : {}),
+        ...(typeof turnCostUsd === 'number' ? { costUsd: turnCostUsd } : {}),
+        ...(turnCostSource ? { costSource: turnCostSource } : {}),
+        ...(turnCostBreakdown ? { costBreakdown: omitUndefinedKeys(turnCostBreakdown) } : {}),
+        ...(typeof modelKey === 'string' && modelKey.trim() ? { modelKey: modelKey.trim() } : {}),
+        provider,
+        ...(model ? { model } : {}),
+        costRecordedAt: new Date().toISOString()
     }
     const finalMessages = [...existingMessages, message, assistantMessage].map((m) => {
         const cleaned = omitUndefinedKeys(m)
@@ -231,6 +263,7 @@ const sendMessage = async (
         }
         return cleaned
     })
+    const totalCostUsd = sumChatCostUsd(finalMessages)
 
     const inferenceFields = {
         provider,
@@ -250,6 +283,7 @@ const sendMessage = async (
             name: generatedTitle || fallbackTitle,
             userId: user.uid,
             messages: finalMessages,
+            totalCostUsd,
             lastUpdated: serverTimestamp(),
             ...inferenceFields
         })
@@ -258,6 +292,7 @@ const sendMessage = async (
 
     await updateDoc(doc(db, 'chats', chatId), {
         messages: finalMessages,
+        totalCostUsd,
         lastUpdated: serverTimestamp(),
         userId: user.uid,
         ...inferenceFields

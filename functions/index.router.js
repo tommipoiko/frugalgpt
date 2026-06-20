@@ -13,6 +13,7 @@ const anthropicProvider = require('./providers/anthropicProvider')
 const geminiProvider = require('./providers/geminiProvider')
 const mistralProvider = require('./providers/mistralProvider')
 const { generateChatTitle } = require('./providers/chatTitle')
+const { computeTurnCost } = require('./usageCost')
 
 admin.initializeApp()
 
@@ -244,7 +245,30 @@ exports.generateChatResponseStreamHttp = onRequest(
                 })
             }
 
-            res.write(`${JSON.stringify({ type: 'done', ...result, title })}\n`)
+            const {
+                usage,
+                costUsd,
+                costSource,
+                costBreakdown
+            } = computeTurnCost(
+                provider,
+                selectedModel,
+                result.usage,
+                pipelineMessages,
+                result.assistantResponse
+            )
+
+            res.write(`${JSON.stringify({
+                type: 'done',
+                ...result,
+                title,
+                usage,
+                costUsd,
+                costSource,
+                costBreakdown,
+                provider,
+                model: selectedModel
+            })}\n`)
             res.end()
         } catch (error) {
             console.error('generateChatResponseStreamHttp failed:', error)

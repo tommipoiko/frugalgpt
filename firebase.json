@@ -1,6 +1,9 @@
 {
   "functions": {
-    "source": "functions"
+    "source": "functions",
+    "predeploy": [
+      "cp models.json functions/models.json"
+    ]
   },
   "firestore": {
     "rules": "firestore.rules",

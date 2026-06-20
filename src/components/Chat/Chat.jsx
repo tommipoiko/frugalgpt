@@ -17,6 +17,7 @@ import ProviderLogo from '../Brand/ProviderLogo'
 import useKeyboardOverlapBottom from '../../hooks/useKeyboardOverlapBottom'
 import useIsMobile from '../../hooks/useIsMobile'
 import { summarizeAttachmentsForStore } from '../../utils/attachmentParts'
+import { buildChatCostTooltip, formatChatCostUsd, summarizeChatCost } from '../../utils/chatCost'
 import {
     defaultModelKeyForUser,
     getChatModelEntry,
@@ -610,6 +611,11 @@ function Chat({ currentChat }) {
         }
     }
 
+    const chatCost = useMemo(() => summarizeChatCost(messages), [messages])
+    const chatCostTooltip = useMemo(
+        () => buildChatCostTooltip(chatCost),
+        [chatCost]
+    )
     const isEmpty = messages.length === 0 && !isSendingMessage
     const showJumpLatest = !autoScrollEnabled && !isEmpty
     const threadWidth = 'w-full max-w-[min(100%,calc(100vw-1rem))] sm:max-w-[800px]'
@@ -728,16 +734,28 @@ function Chat({ currentChat }) {
                                     }
                                 />
                             </label>
-                            <button
-                                type="button"
-                                onClick={() => setModelSheetOpen(true)}
-                                aria-label={modelSelectorLabel}
-                                title={modelSelectorLabel}
-                                className="group relative flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-slate-200/80 bg-white text-slate-800 shadow-sm transition hover:-translate-y-[1px] hover:bg-slate-50 hover:shadow min-[600px]:order-2 dark:border-white/[0.10] dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800"
-                            >
-                                <ProviderLogo provider={provider} size={20} />
-                                <span className="pointer-events-none absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border border-white bg-brand-500 dark:border-zinc-900" />
-                            </button>
+                            <div className="flex items-center gap-2 min-[600px]:order-2">
+                                <button
+                                    type="button"
+                                    onClick={() => setModelSheetOpen(true)}
+                                    aria-label={modelSelectorLabel}
+                                    title={modelSelectorLabel}
+                                    className="group relative flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-slate-200/80 bg-white text-slate-800 shadow-sm transition hover:-translate-y-[1px] hover:bg-slate-50 hover:shadow dark:border-white/[0.10] dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800"
+                                >
+                                    <ProviderLogo provider={provider} size={20} />
+                                    <span className="pointer-events-none absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border border-white bg-brand-500 dark:border-zinc-900" />
+                                </button>
+                                <span
+                                    className="shrink-0 text-[11px] tabular-nums text-slate-500 sm:text-xs dark:text-zinc-400"
+                                    title={chatCostTooltip}
+                                >
+                                    Chat cost:
+                                    {' '}
+                                    {chatCost.hasEstimate ? '~' : ''}
+                                    $
+                                    {formatChatCostUsd(chatCost.totalUsd)}
+                                </span>
+                            </div>
                         </div>
                         <button
                             type="submit"

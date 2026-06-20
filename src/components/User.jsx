@@ -2,19 +2,22 @@ import React, {
     useState, useEffect
 } from 'react'
 import {
-    Key, Sun, Moon, Monitor, Eye, EyeOff, Loader2
+    Key, Sun, Moon, Monitor, Eye, EyeOff, Loader2, DollarSign
 } from 'lucide-react'
 import clsx from 'clsx'
 import {
     doc, getDoc, setDoc, deleteField, onSnapshot
 } from 'firebase/firestore'
 import { auth, db } from '../services/firebase'
+import { fetchSpendingLast30Days } from '../services/spendingApi'
+import { formatChatCostUsd } from '../utils/chatCost'
+import ProviderLogo from './Brand/ProviderLogo'
 import useKeyboardOverlapBottom from '../hooks/useKeyboardOverlapBottom'
 
 const PROVIDER_CONFIG = [
     { id: 'openai', label: 'OpenAI', placeholder: 'sk-...' },
     { id: 'anthropic', label: 'Anthropic', placeholder: 'sk-ant-...' },
-    { id: 'google', label: 'Google AI (Gemini)', placeholder: 'AIza...' },
+    { id: 'google', label: 'Google', placeholder: 'AIza...' },
     { id: 'mistral', label: 'Mistral', placeholder: '...' }
 ]
 
@@ -58,20 +61,45 @@ function User({ setMode }) {
     const [theme, setTheme] = useState(() => localStorage.getItem('frugalGptTheme') || 'system')
     const [loading, setLoading] = useState(true)
     const [saving, setSaving] = useState(false)
+    const [spendingLoading, setSpendingLoading] = useState(true)
+    const [spending, setSpending] = useState(null)
+    const [spendingError, setSpendingError] = useState('')
 
     useEffect(() => {
         let unsubSettings = () => {}
+        let cancelled = false
+
+        const loadSpending = async (uid) => {
+            setSpendingLoading(true)
+            setSpendingError('')
+            try {
+                const summary = await fetchSpendingLast30Days(uid)
+                if (!cancelled) setSpending(summary)
+            } catch (error) {
+                console.error('Failed to load spending summary:', error)
+                if (!cancelled) {
+                    setSpending(null)
+                    setSpendingError('Could not load usage totals. Check your connection and try again.')
+                }
+            } finally {
+                if (!cancelled) setSpendingLoading(false)
+            }
+        }
 
         const unsubscribe = auth.onAuthStateChanged((currentUser) => {
             unsubSettings()
             if (!currentUser) {
                 setLoading(false)
+                setSpendingLoading(false)
+                setSpending(null)
+                setSpendingError('')
                 setFeedback({ severity: 'warning', message: 'You are not signed in.' })
                 return
             }
 
             setLoading(true)
             setFeedback(null)
+            loadSpending(currentUser.uid)
             unsubSettings = onSnapshot(
                 doc(db, 'users', currentUser.uid),
                 (docSnap) => {
@@ -92,6 +120,7 @@ function User({ setMode }) {
         })
 
         return () => {
+            cancelled = true
             unsubscribe()
             unsubSettings()
         }
@@ -226,6 +255,95 @@ function User({ setMode }) {
                         </div>
                     </div>
                 )}
+
+                <section className="mb-6 rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm dark:border-white/[0.08] dark:bg-zinc-900">
+                    <div className="flex items-start gap-3">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-500/10 text-brand-600 dark:text-brand-400">
+                            <DollarSign className="h-5 w-5" aria-hidden />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-zinc-500">
+                                Usage
+                            </p>
+                            <h2 className="mt-1 text-lg font-semibold text-slate-900 dark:text-white">
+                                Last 30 days
+                            </h2>
+                            <p className="mt-1 text-sm text-slate-600 dark:text-zinc-400">
+                                Estimated API spend from chat usage, broken down by provider.
+                            </p>
+                        </div>
+                    </div>
+
+                    {spendingLoading ? (
+                        <div className="mt-5 flex items-center gap-2 text-sm text-slate-500 dark:text-zinc-400">
+                            <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+                            Loading spend…
+                        </div>
+                    ) : (
+                        <>
+                            {spendingError && (
+                                <p className="mt-4 text-sm text-red-600 dark:text-red-400">
+                                    {spendingError}
+                                </p>
+                            )}
+                            <div className="mt-5 rounded-xl border border-slate-200/80 bg-slate-50 px-4 py-3 dark:border-white/[0.08] dark:bg-zinc-950/60">
+                                <p className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-zinc-500">
+                                    Total
+                                </p>
+                                <p className="mt-1 text-2xl font-semibold tabular-nums text-slate-900 dark:text-white">
+                                    $
+                                    {formatChatCostUsd(spending?.totalUsd || 0)}
+                                </p>
+                                {spending && (spending.estimatedTurns > 0) && (
+                                    <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">
+                                        Includes
+                                        {' '}
+                                        {spending.estimatedTurns}
+                                        {' '}
+                                        estimated turn(s).
+                                    </p>
+                                )}
+                            </div>
+
+                            <ul className="mt-4 space-y-2">
+                                {PROVIDER_CONFIG.map(({ id, label }) => {
+                                    const amount = spending?.byProvider?.[id] || 0
+                                    return (
+                                        <li
+                                            key={id}
+                                            className="flex items-center justify-between gap-3 rounded-xl border border-slate-200/70 px-3 py-2.5 dark:border-white/[0.08]"
+                                        >
+                                            <div className="flex min-w-0 items-center gap-2.5">
+                                                <ProviderLogo provider={id} size={18} />
+                                                <span className="truncate text-sm font-medium text-slate-800 dark:text-zinc-200">
+                                                    {label}
+                                                </span>
+                                            </div>
+                                            <span className="shrink-0 text-sm tabular-nums text-slate-600 dark:text-zinc-300">
+                                                $
+                                                {formatChatCostUsd(amount)}
+                                            </span>
+                                        </li>
+                                    )
+                                })}
+                            </ul>
+
+                            {!spendingError && spending?.chatsScanned > 0 && spending.totalUsd === 0 && (
+                                <p className="mt-4 text-xs leading-relaxed text-amber-700 dark:text-amber-300">
+                                    No costs recorded yet for recent chats. Send a new message in each
+                                    provider to start tracking, or deploy the latest cloud functions if
+                                    usage data is missing from older turns.
+                                </p>
+                            )}
+
+                            <p className="mt-4 text-xs leading-relaxed text-slate-500 dark:text-zinc-500">
+                                Based on stored message usage (tokens, cache, web search, and
+                                documented surcharges). Only turns with a recorded cost in the
+                                last 30 days are included.
+                            </p>
+                        </>
+                    )}
+                </section>
 
                 <section className="mb-6 rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm dark:border-white/[0.08] dark:bg-zinc-900">
                     <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-zinc-500">

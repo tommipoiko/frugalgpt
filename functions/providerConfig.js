@@ -8,13 +8,13 @@ const inferCapabilities = (provider, modelId) => {
     }
     if (provider === 'anthropic') {
         return {
-            reasoning: /^claude-(opus-4-7|sonnet-4-6)$/i.test(id),
+            reasoning: /^claude-(opus-4-[78]|sonnet-4-6)$/i.test(id),
             webSearch: true
         }
     }
     if (provider === 'google') {
         return {
-            reasoning: /^gemini-3\.1-pro-preview$/i.test(id),
+            reasoning: /^gemini-3\.(1-pro-preview|5-flash)$/i.test(id),
             webSearch: true
         }
     }

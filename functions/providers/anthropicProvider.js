@@ -11,7 +11,7 @@ const providerId = 'anthropic'
 
 const getThinkingConfigForModel = (modelId, reasoningEnabled) => {
     if (!reasoningEnabled) return undefined
-    if (modelId === 'claude-opus-4-7') {
+    if (modelId === 'claude-opus-4-8' || modelId === 'claude-opus-4-7') {
         return {
             type: 'adaptive',
             display: 'summarized'
@@ -77,7 +77,23 @@ const streamReply = async ({
     }
 
     if (!fullText.trim()) throw new Error('No response received from Anthropic.')
-    return { assistantResponse: fullText, title: null, sources: collectedSources }
+
+    let usage = null
+    try {
+        const finalMessage = await stream.finalMessage()
+        if (finalMessage?.usage) {
+            usage = { ...finalMessage.usage, estimated: false }
+        }
+    } catch (error) {
+        console.warn('Anthropic usage unavailable:', error?.message || error)
+    }
+
+    return {
+        assistantResponse: fullText,
+        title: null,
+        sources: collectedSources,
+        usage
+    }
 }
 
 const listModels = async ({ inferCapabilities }) => listRequiredModelsForProvider(providerId)

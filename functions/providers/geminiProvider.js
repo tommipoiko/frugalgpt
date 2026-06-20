@@ -35,16 +35,23 @@ const streamReply = async ({
 
     let fullText = ''
     let searchStatusSent = false
+    let usageMetadata = null
+    let webSearchQueries = 0
     for await (const chunk of stream) {
+        if (chunk.usageMetadata) {
+            usageMetadata = chunk.usageMetadata
+        }
         const candidate = chunk.candidates?.[0]
         const parts = candidate?.content?.parts ?? []
         if (
             webSearchEnabled
-            && !searchStatusSent
             && candidate?.groundingMetadata?.webSearchQueries?.length
         ) {
-            searchStatusSent = true
-            if (onStatus) onStatus({ state: 'searching', message: 'Searching the web...' })
+            webSearchQueries = candidate.groundingMetadata.webSearchQueries.length
+            if (!searchStatusSent) {
+                searchStatusSent = true
+                if (onStatus) onStatus({ state: 'searching', message: 'Searching the web...' })
+            }
         }
         for (const part of parts) {
             if (!part?.text) continue
@@ -63,7 +70,21 @@ const streamReply = async ({
     }
 
     if (!fullText.trim()) throw new Error('No response received from Gemini.')
-    return { assistantResponse: fullText, title: null, sources: collectedSources }
+
+    const usage = usageMetadata
+        ? {
+            ...usageMetadata,
+            webSearchQueries,
+            estimated: false
+        }
+        : null
+
+    return {
+        assistantResponse: fullText,
+        title: null,
+        sources: collectedSources,
+        usage
+    }
 }
 
 const listModels = async ({ inferCapabilities }) => listRequiredModelsForProvider(providerId)

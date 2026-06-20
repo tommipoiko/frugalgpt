@@ -1,16 +1,12 @@
 import { AVAILABLE_CHAT_MODELS } from './availableModels'
+import catalog from '../../models.json'
 
 describe('AVAILABLE_CHAT_MODELS web search support', () => {
     it('contains exactly the required model ids', () => {
-        expect(AVAILABLE_CHAT_MODELS.map((model) => model.key)).toEqual([
-            'gpt-5.4',
-            'gpt-5.5',
-            'gemini-3.1-pro-preview',
-            'claude-sonnet-4-6',
-            'claude-opus-4-7',
-            'magistral-small-latest',
-            'magistral-medium-latest'
-        ])
+        const expectedKeys = Object.values(catalog.providers).flatMap(
+            (provider) => provider.models.map((model) => model.id)
+        )
+        expect(AVAILABLE_CHAT_MODELS.map((model) => model.key)).toEqual(expectedKeys)
     })
 
     it('keeps API model ids equal to UI keys', () => {

@@ -9,7 +9,7 @@
     "lint": "echo \"No function lint configured\"",
     "test": "node --test",
     "serve": "firebase emulators:start --only functions",
-    "deploy": "firebase deploy --only functions"
+    "deploy": "cp ../models.json ./models.json && firebase deploy --only functions"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.92.0",

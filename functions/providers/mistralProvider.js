@@ -258,6 +258,7 @@ const streamChatCompletion = async ({
 }) => {
     const { collectedSources, recordSource } = createSourceRecorder(onSource)
     const fullTextRef = { value: '' }
+    let usage = null
 
     const requestBody = {
         model: modelId,
@@ -271,6 +272,9 @@ const streamChatCompletion = async ({
     const response = await mistralFetch('/chat/completions', apiKey, requestBody)
 
     await parseSseDataLines(response.body, (json) => {
+        if (json?.usage) {
+            usage = { ...json.usage, estimated: false }
+        }
         const { text, reasoning } = extractFromChatCompletionEvent(json, recordSource)
         emitParsedDelta({
             text,
@@ -285,7 +289,8 @@ const streamChatCompletion = async ({
     return {
         assistantResponse: fullTextRef.value,
         title: null,
-        sources: collectedSources
+        sources: collectedSources,
+        usage
     }
 }
 
@@ -305,6 +310,8 @@ const streamConversation = async ({
 }) => {
     const { collectedSources, recordSource } = createSourceRecorder(onSource)
     const fullTextRef = { value: '' }
+    let usage = null
+    let webSearchRequests = 0
 
     const requestBody = {
         agent_id: await resolveWebSearchAgentId({
@@ -324,6 +331,18 @@ const streamConversation = async ({
     await parseSseDataLines(response.body, (json) => {
         const streamError = getConversationErrorMessage(json)
         if (streamError) throw new Error(streamError)
+
+        if (json?.usage) {
+            usage = {
+                ...json.usage,
+                web_search_requests: webSearchRequests,
+                estimated: false
+            }
+        }
+
+        if (json.type === 'tool.execution.done' && json.name === 'web_search') {
+            webSearchRequests += 1
+        }
 
         handleConversationStatus(json, onStatus)
         if (webSearchEnabled) {
@@ -375,7 +394,12 @@ const streamConversation = async ({
     return {
         assistantResponse: fullTextRef.value,
         title: null,
-        sources: collectedSources
+        sources: collectedSources,
+        usage: usage
+            ? { ...usage, web_search_requests: webSearchRequests, estimated: false }
+            : (webSearchRequests
+                ? { prompt_tokens: 0, completion_tokens: 0, web_search_requests: webSearchRequests, estimated: false }
+                : null)
     }
 }
 
