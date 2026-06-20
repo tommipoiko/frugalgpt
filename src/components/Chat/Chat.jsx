@@ -9,6 +9,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { doc, onSnapshot } from 'firebase/firestore'
 import { db, auth } from '../../services/firebase'
 import chatApi from '../../services/chatApi'
+import { fetchDailyUsageLast30Days } from '../../services/spendingApi'
 import MessageBubble from './MessageBubble/MessageBubble'
 import EmptyState from './EmptyState'
 import ThinkingIndicator from './ThinkingIndicator'
@@ -26,6 +27,7 @@ import {
     resolveChatInferenceFromFirestore
 } from '../../constants/availableModels'
 import { formatChatModelError } from '../../utils/chatModelErrors'
+import { estimateDailyModelCost } from '../../utils/estimateDailyModelCost'
 
 const MAX_ATTACHMENT_SLOTS = 5
 const COMPOSER_MAX_HEIGHT = 240
@@ -90,6 +92,8 @@ function Chat({ currentChat }) {
     const [sheetDraftReasoning, setSheetDraftReasoning] = useState(true)
     const [sheetDraftWeb, setSheetDraftWeb] = useState(true)
     const [editPromptState, setEditPromptState] = useState(null)
+    const [averageDailyUsage, setAverageDailyUsage] = useState(null)
+    const [dailyUsageLoading, setDailyUsageLoading] = useState(false)
 
     const { id } = useParams()
     const navigate = useNavigate()
@@ -118,6 +122,27 @@ function Chat({ currentChat }) {
         [selectedModelKey, chatInference]
     )
     const { provider } = selectedEntry
+
+    const sheetDraftEntry = useMemo(
+        () => (isExistingChat && chatInference?.entry
+            ? chatInference.entry
+            : getChatModelEntry(sheetDraftModelKey)),
+        [isExistingChat, chatInference, sheetDraftModelKey]
+    )
+
+    const dailyCostEstimate = useMemo(() => {
+        if (!averageDailyUsage) return null
+        const webEnabled = isExistingChat ? webSearchEnabled : sheetDraftWeb
+        return estimateDailyModelCost(sheetDraftEntry, averageDailyUsage, {
+            webSearchEnabled: webEnabled
+        })
+    }, [
+        averageDailyUsage,
+        sheetDraftEntry,
+        isExistingChat,
+        webSearchEnabled,
+        sheetDraftWeb
+    ])
 
     useEffect(() => () => {
         attachmentsRef.current.forEach((a) => {
@@ -262,6 +287,29 @@ function Chat({ currentChat }) {
         }
         prevSheetOpen.current = modelSheetOpen
     }, [modelSheetOpen, selectedModelKey, reasoningEnabled, webSearchEnabled])
+
+    useEffect(() => {
+        if (!modelSheetOpen || !currentUser?.uid) return undefined
+
+        let cancelled = false
+        setDailyUsageLoading(true)
+
+        fetchDailyUsageLast30Days(currentUser.uid)
+            .then((summary) => {
+                if (!cancelled) setAverageDailyUsage(summary.averageDaily)
+            })
+            .catch((error) => {
+                console.error('Failed to load daily usage summary:', error)
+                if (!cancelled) setAverageDailyUsage(null)
+            })
+            .finally(() => {
+                if (!cancelled) setDailyUsageLoading(false)
+            })
+
+        return () => {
+            cancelled = true
+        }
+    }, [modelSheetOpen, currentUser?.uid])
 
     useEffect(() => {
         if (autoScrollEnabled && listRef.current) {
@@ -466,6 +514,11 @@ function Chat({ currentChat }) {
             }
             setMessages(finalMessages)
             setActivityState(null)
+            if (currentUser?.uid) {
+                fetchDailyUsageLast30Days(currentUser.uid)
+                    .then((summary) => setAverageDailyUsage(summary.averageDaily))
+                    .catch(() => {})
+            }
             if (!id && chatId) {
                 navigate(`/chats/${chatId}`, { replace: true })
             }
@@ -835,6 +888,8 @@ function Chat({ currentChat }) {
                 entry={selectedEntry}
                 onApply={handleSheetApply}
                 readOnly={isExistingChat}
+                dailyCostEstimate={dailyCostEstimate}
+                dailyUsageLoading={dailyUsageLoading}
             />
 
             <div

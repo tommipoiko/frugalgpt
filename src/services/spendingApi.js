@@ -3,6 +3,12 @@ import {
 } from 'firebase/firestore'
 import { db } from './firebase'
 import { aggregateMessageCosts } from '../utils/spendingAggregation'
+import {
+    aggregateDailyUsageFromMessages,
+    computeAverageDailyUsage,
+    getUsageCutoffDate,
+    mergeDailyUsageMaps
+} from '../utils/dailyUsageAggregation'
 
 const PROVIDER_IDS = ['openai', 'anthropic', 'google', 'mistral']
 
@@ -48,6 +54,37 @@ export async function fetchSpendingLast30Days(userId) {
         measuredTurns,
         estimatedTurns,
         chatsScanned,
+        cutoffDate: cutoffDate.toISOString()
+    }
+}
+
+export async function fetchDailyUsageLast30Days(userId) {
+    const cutoffDate = getUsageCutoffDate()
+
+    const chatsQuery = query(
+        collection(db, 'chats'),
+        where('userId', '==', userId),
+        where('lastUpdated', '>=', Timestamp.fromDate(cutoffDate))
+    )
+    const snapshot = await getDocs(chatsQuery)
+
+    const dailyMaps = []
+    snapshot.forEach((docSnap) => {
+        const data = docSnap.data()
+        dailyMaps.push(aggregateDailyUsageFromMessages(data.messages, cutoffDate, {
+            provider: data.provider,
+            model: data.model,
+            modelKey: data.modelKey
+        }))
+    })
+
+    const byDate = mergeDailyUsageMaps(...dailyMaps)
+    const averageDaily = computeAverageDailyUsage(byDate)
+
+    return {
+        byDate,
+        averageDaily,
+        activeDays: averageDaily?.activeDays || 0,
         cutoffDate: cutoffDate.toISOString()
     }
 }

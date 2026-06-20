@@ -400,5 +400,6 @@ export {
     estimateUsage,
     normalizeProviderUsage,
     normalizeUsage,
-    computeTurnCost
+    computeTurnCost,
+    computeProviderCost
 }

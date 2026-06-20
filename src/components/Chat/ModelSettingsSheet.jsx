@@ -3,6 +3,8 @@ import { X } from 'lucide-react'
 import clsx from 'clsx'
 import ProviderLogo from '../Brand/ProviderLogo'
 import { getChatModelEntry } from '../../constants/availableModels'
+import { formatChatCostUsd } from '../../utils/chatCost'
+import { formatCompactCount } from '../../utils/dailyUsageAggregation'
 
 function ModelSettingsSheet({
     open,
@@ -17,7 +19,9 @@ function ModelSettingsSheet({
     readOnly = false,
     entry = null,
     /** Allowed catalog rows for this user */
-    models
+    models,
+    dailyCostEstimate = null,
+    dailyUsageLoading = false
 }) {
     useEffect(() => {
         if (!open) return undefined
@@ -33,6 +37,14 @@ function ModelSettingsSheet({
     const draftEntry = readOnly && entry ? entry : getChatModelEntry(draftModelKey)
     const showReasoningToggle = draftEntry.reasoningMode === 'toggle'
     const showWebToggle = draftEntry.webSearch === true
+
+    const usageParts = dailyCostEstimate ? [
+        `${formatCompactCount(dailyCostEstimate.inputTokens)} in`,
+        `${formatCompactCount(dailyCostEstimate.outputTokens)} out`,
+        ...(dailyCostEstimate.webSearches > 0
+            ? [`${formatCompactCount(dailyCostEstimate.webSearches)} searches`]
+            : [])
+    ] : []
 
     const panelClassName = clsx(
         'flex w-full flex-col bg-[#f7f7f8] shadow-2xl dark:bg-[#0b0b0f]',
@@ -134,6 +146,47 @@ function ModelSettingsSheet({
                             onChange={(e) => onDraftWebSearchChange(e.target.checked)}
                         />
                     </label>
+                )}
+
+                {dailyUsageLoading && (
+                    <p className="text-xs text-slate-500 dark:text-zinc-400">
+                        Loading your usage stats…
+                    </p>
+                )}
+
+                {!dailyUsageLoading && dailyCostEstimate && (
+                    <div className="rounded-xl border border-slate-200/80 bg-slate-50 px-4 py-3 dark:border-white/[0.08] dark:bg-zinc-900/80">
+                        <p className="text-sm leading-relaxed text-slate-700 dark:text-zinc-200">
+                            At your usual daily usage
+                            {' '}
+                            (
+                            {usageParts.join(', ')}
+                            ), this model would cost about
+                            {' '}
+                            <span className="font-semibold tabular-nums text-slate-900 dark:text-white">
+                                $
+                                {formatChatCostUsd(dailyCostEstimate.costUsd)}
+                                /day
+                            </span>
+                            .
+                        </p>
+                        <p className="mt-1.5 text-xs text-slate-500 dark:text-zinc-400">
+                            Averaged over
+                            {' '}
+                            {dailyCostEstimate.activeDays}
+                            {' '}
+                            active day
+                            {dailyCostEstimate.activeDays === 1 ? '' : 's'}
+                            {' '}
+                            in the last 30 days.
+                        </p>
+                    </div>
+                )}
+
+                {!dailyUsageLoading && !dailyCostEstimate && (
+                    <p className="text-xs leading-relaxed text-slate-500 dark:text-zinc-400">
+                        Send a few messages to see a personalized daily cost estimate for each model.
+                    </p>
                 )}
 
                 {readOnly && (
