@@ -275,9 +275,9 @@ function Sidenav({ user, onNavigateChat, currentChatId }) {
                         onClick={(e) => handleMenuOpen(e, chat.id)}
                         className={clsx(
                             'absolute right-1 top-1/2 -translate-y-1/2 rounded-lg p-1 text-zinc-500',
-                            'transition-opacity max-xs:opacity-100 max-xs:pointer-events-auto',
-                            'opacity-0 pointer-events-none xs:group-hover:opacity-100',
-                            'xs:group-hover:pointer-events-auto',
+                            'transition-opacity max-[599px]:opacity-100 max-[599px]:pointer-events-auto',
+                            'opacity-0 pointer-events-none max-[599px]:group-hover:opacity-100',
+                            'max-[599px]:group-hover:pointer-events-auto',
                             'focus-visible:opacity-100 focus-visible:pointer-events-auto'
                         )}
                     >

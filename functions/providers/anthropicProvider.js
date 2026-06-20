@@ -4,7 +4,8 @@ const {
     toAnthropicMessages,
     createSourceRecorder,
     collectSourcesFromUnknown,
-    enrichModelRow
+    enrichModelRow,
+    stitchStreamTextDelta
 } = require('./shared')
 
 const providerId = 'anthropic'
@@ -66,8 +67,9 @@ const streamReply = async ({
                 if (onReasoningDelta) onReasoningDelta(event.delta.thinking)
                 if (onStatus) onStatus({ state: 'reasoning', message: 'Reasoning...' })
             } else if (event.delta?.type === 'text_delta' && event.delta.text) {
-                fullText += event.delta.text
-                onDelta(event.delta.text)
+                const incomingText = stitchStreamTextDelta(fullText, event.delta.text)
+                fullText += incomingText
+                onDelta(incomingText)
                 if (onStatus) onStatus({ state: 'responding', message: 'Generating answer...' })
             }
         }

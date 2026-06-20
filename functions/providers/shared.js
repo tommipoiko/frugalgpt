@@ -143,6 +143,32 @@ const enrichModelRow = (provider, id, inferCapabilities) => ({
     relativeCost: 1
 })
 
+/** e.g. "time.Great" -> "time.\n\nGreat" (avoids breaking "U.S.Government") */
+const GLUED_SENTENCE_BOUNDARY_RE = /(?<=[a-z0-9])([.!?])(?=[A-Z])/g
+
+const splitGluedSentenceBoundaries = (text) => {
+    if (!text) return ''
+    return text.replace(GLUED_SENTENCE_BOUNDARY_RE, '$1\n\n')
+}
+
+const stitchStreamTextDelta = (prevText, nextDelta) => {
+    if (!nextDelta) return ''
+    const normalizedDelta = splitGluedSentenceBoundaries(nextDelta)
+    if (!prevText) return normalizedDelta
+    if (/^\s/.test(normalizedDelta) || /\s$/.test(prevText)) return normalizedDelta
+
+    if (/[.!?]$/.test(prevText) && /^[A-Z]/.test(normalizedDelta)) {
+        return `\n\n${normalizedDelta}`
+    }
+
+    // Chunk split across tokens: "...time" + ".Great..."
+    if (/[a-z0-9]$/.test(prevText) && /^\.(?=[A-Z])/.test(normalizedDelta)) {
+        return `.\n\n${normalizedDelta.slice(1)}`
+    }
+
+    return normalizedDelta
+}
+
 module.exports = {
     normalizeMessagesForOpenAiInput,
     toAnthropicMessages,
@@ -151,5 +177,6 @@ module.exports = {
     createSourceRecorder,
     collectSourcesFromUnknown,
     parseSseDataLines,
-    enrichModelRow
+    enrichModelRow,
+    stitchStreamTextDelta
 }

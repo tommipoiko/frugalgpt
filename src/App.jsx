@@ -173,7 +173,7 @@ function App() {
                     'shrink-0 z-[1300] box-border pt-[env(safe-area-inset-top)]',
                     'border-b border-slate-900/[0.06] dark:border-white/[0.06]',
                     'bg-[#f7f7f8]/95 dark:bg-[#0b0b0f]/95 backdrop-blur-xl',
-                    'xs:bg-[#f7f7f8] xs:backdrop-blur-none dark:xs:bg-[#0b0b0f]'
+                    'max-[599px]:bg-[#f7f7f8] max-[599px]:backdrop-blur-none dark:max-[599px]:bg-[#0b0b0f]'
                 )}
             >
                 <div
@@ -309,7 +309,7 @@ function App() {
                     className={clsx(
                         'flex flex-1 flex-col min-h-0 min-w-0 overflow-hidden',
                         'pl-[max(12px,env(safe-area-inset-left))] pr-[max(12px,env(safe-area-inset-right))]',
-                        'xs:pl-8 xs:pr-8'
+                        'max-[599px]:pl-8 max-[599px]:pr-8'
                     )}
                     style={{
                         marginLeft: desktopDrawerVisible ? '280px' : undefined

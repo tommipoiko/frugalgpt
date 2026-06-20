@@ -339,17 +339,7 @@ function MessageBubble({
             <div className="w-full min-w-0 flex-1 break-words text-[0.95rem] leading-relaxed text-slate-900 dark:text-zinc-100">
                 {message.content
                     ? <AssistantMarkdown content={message.content} />
-                    : (
-                        <div className="flex gap-1.5 py-2">
-                            {[0, 1, 2].map((dot) => (
-                                <span
-                                    key={dot}
-                                    className="h-1.5 w-1.5 animate-pulse rounded-full bg-slate-400 opacity-40 dark:bg-zinc-500"
-                                    style={{ animationDelay: `${dot * 0.18}s` }}
-                                />
-                            ))}
-                        </div>
-                    )}
+                    : null}
                 {Array.isArray(message.sources) && message.sources.length > 0 && (
                     <Sources sources={message.sources} />
                 )}
