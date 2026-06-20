@@ -1,4 +1,5 @@
 import {
+    AVAILABLE_CHAT_MODELS,
     buildLegacyModelEntry,
     findCatalogModel,
     getChatModelEntry,
@@ -7,6 +8,19 @@ import {
 } from './availableModels'
 
 describe('chat model persistence helpers', () => {
+    it('lists catalog models in provider and model order', () => {
+        expect(AVAILABLE_CHAT_MODELS.map((entry) => entry.key)).toEqual([
+            'claude-sonnet-4-6',
+            'claude-opus-4-8',
+            'gemini-3.1-pro-preview',
+            'gemini-3.5-flash',
+            'magistral-small-latest',
+            'magistral-medium-latest',
+            'gpt-5.4',
+            'gpt-5.5'
+        ])
+    })
+
     it('finds catalog models by provider and api id', () => {
         const entry = findCatalogModel({
             provider: 'openai',

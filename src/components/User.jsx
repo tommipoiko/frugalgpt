@@ -13,13 +13,20 @@ import { fetchSpendingLast30Days } from '../services/spendingApi'
 import { formatDisplayedSpendingUsd } from '../utils/chatCost'
 import ProviderLogo from './Brand/ProviderLogo'
 import useKeyboardOverlapBottom from '../hooks/useKeyboardOverlapBottom'
+import { getProviderLabel, PROVIDER_ORDER } from '../constants/availableModels'
 
-const PROVIDER_CONFIG = [
-    { id: 'openai', label: 'OpenAI', placeholder: 'sk-...' },
-    { id: 'anthropic', label: 'Anthropic', placeholder: 'sk-ant-...' },
-    { id: 'google', label: 'Google', placeholder: 'AIza...' },
-    { id: 'mistral', label: 'Mistral', placeholder: '...' }
-]
+const PROVIDER_PLACEHOLDERS = {
+    anthropic: 'sk-ant-...',
+    google: 'AIza...',
+    mistral: '...',
+    openai: 'sk-...'
+}
+
+const PROVIDER_CONFIG = PROVIDER_ORDER.map((id) => ({
+    id,
+    label: getProviderLabel(id),
+    placeholder: PROVIDER_PLACEHOLDERS[id]
+}))
 
 const emptyProvidersState = () => ({
     openai: { apiKey: '' },

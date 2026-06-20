@@ -9,8 +9,15 @@ import catalog from '../../models.json'
  * webSearch: show “Web browsing” toggle only when true for this model.
  */
 
-export const AVAILABLE_CHAT_MODELS = Object.entries(catalog.providers || {}).flatMap(
-    ([providerId, provider]) => (provider.models || []).map((model) => ({
+export const PROVIDER_ORDER = ['anthropic', 'google', 'mistral', 'openai']
+
+const providerRank = (providerId) => {
+    const index = PROVIDER_ORDER.indexOf(providerId)
+    return index === -1 ? PROVIDER_ORDER.length : index
+}
+
+export const AVAILABLE_CHAT_MODELS = Object.entries(catalog.providers || {})
+    .flatMap(([providerId, provider]) => (provider.models || []).map((model, modelIndex) => ({
         key: model.id,
         provider: providerId,
         providerLabel: provider.name || providerId,
@@ -19,12 +26,18 @@ export const AVAILABLE_CHAT_MODELS = Object.entries(catalog.providers || {}).fla
         reasoningMode: model.reasoningMode,
         webSearch: model.webSearch === true,
         isLegacy: false,
+        catalogOrder: modelIndex,
         pricing: {
             inputPer1MUsd: model.inputPricingUsd,
             outputPer1MUsd: model.outputPricingUsd
         }
-    }))
-)
+    })))
+    .sort((a, b) => {
+        const providerDiff = providerRank(a.provider) - providerRank(b.provider)
+        if (providerDiff !== 0) return providerDiff
+        return a.catalogOrder - b.catalogOrder
+    })
+    .map(({ catalogOrder, ...entry }) => entry)
 
 export function getProviderLabel(providerId) {
     return catalog.providers?.[providerId]?.name || providerId
@@ -158,5 +171,9 @@ export function buildInferenceDocFields(entry, { reasoningEnabled, webSearchEnab
 
 export function defaultModelKeyForUser(hasProviderKey) {
     const allowed = listChatModelsForUser(hasProviderKey)
+    const openaiDefault = catalog.providers?.openai?.defaultModelId
+    if (openaiDefault && allowed.some((entry) => entry.key === openaiDefault)) {
+        return openaiDefault
+    }
     return allowed[0]?.key || AVAILABLE_CHAT_MODELS[0].key
 }

@@ -2,73 +2,6 @@
   "currency": "USD",
   "pricingUnit": "per 1M tokens",
   "providers": {
-    "openai": {
-      "name": "OpenAI",
-      "pricingExtras": {
-        "webSearchUsdPerCall": 0.01,
-        "webSearchNonReasoningUsdPerCall": 0.025,
-        "cachedInputMultiplier": 0.1,
-        "batchDiscountMultiplier": 0.5,
-        "longContextInputTokenThreshold": 272000,
-        "longContextInputMultiplier": 2,
-        "longContextOutputMultiplier": 1.5,
-        "longContextModelIds": ["gpt-5.5"]
-      },
-      "defaultModelId": "gpt-5.4",
-      "models": [
-        {
-          "id": "gpt-5.5",
-          "label": "GPT-5.5",
-          "apiModelId": "gpt-5.5",
-          "reasoningMode": "toggle",
-          "webSearch": true,
-          "isReasoningModel": true,
-          "inputPricingUsd": 5,
-          "outputPricingUsd": 30
-        },
-        {
-          "id": "gpt-5.4",
-          "label": "GPT-5.4",
-          "apiModelId": "gpt-5.4",
-          "reasoningMode": "toggle",
-          "webSearch": true,
-          "isReasoningModel": true,
-          "inputPricingUsd": 2.5,
-          "outputPricingUsd": 15
-        }
-      ]
-    },
-    "google": {
-      "name": "Google",
-      "pricingExtras": {
-        "cachedInputMultiplier": 0.25,
-        "webSearchUsdPerQuery": 0.014,
-        "webSearchFreeQueriesPerMonth": 5000
-      },
-      "defaultModelId": "gemini-3.1-pro-preview",
-      "models": [
-        {
-          "id": "gemini-3.1-pro-preview",
-          "label": "Gemini 3.1 Pro Preview",
-          "apiModelId": "gemini-3.1-pro-preview",
-          "reasoningMode": "fixed-on",
-          "webSearch": true,
-          "geminiMajorVersion": 3,
-          "inputPricingUsd": 2,
-          "outputPricingUsd": 12
-        },
-        {
-          "id": "gemini-3.5-flash",
-          "label": "Gemini 3.5 Flash",
-          "apiModelId": "gemini-3.5-flash",
-          "reasoningMode": "toggle",
-          "webSearch": true,
-          "geminiMajorVersion": 3,
-          "inputPricingUsd": 1.5,
-          "outputPricingUsd": 9
-        }
-      ]
-    },
     "anthropic": {
       "name": "Anthropic",
       "pricingExtras": {
@@ -108,6 +41,37 @@
         }
       ]
     },
+    "google": {
+      "name": "Google",
+      "pricingExtras": {
+        "cachedInputMultiplier": 0.25,
+        "webSearchUsdPerQuery": 0.014,
+        "webSearchFreeQueriesPerMonth": 5000
+      },
+      "defaultModelId": "gemini-3.1-pro-preview",
+      "models": [
+        {
+          "id": "gemini-3.1-pro-preview",
+          "label": "Gemini 3.1 Pro Preview",
+          "apiModelId": "gemini-3.1-pro-preview",
+          "reasoningMode": "fixed-on",
+          "webSearch": true,
+          "geminiMajorVersion": 3,
+          "inputPricingUsd": 2,
+          "outputPricingUsd": 12
+        },
+        {
+          "id": "gemini-3.5-flash",
+          "label": "Gemini 3.5 Flash",
+          "apiModelId": "gemini-3.5-flash",
+          "reasoningMode": "toggle",
+          "webSearch": true,
+          "geminiMajorVersion": 3,
+          "inputPricingUsd": 1.5,
+          "outputPricingUsd": 9
+        }
+      ]
+    },
     "mistral": {
       "name": "Mistral",
       "pricingExtras": {
@@ -133,6 +97,42 @@
           "webSearch": true,
           "inputPricingUsd": 2,
           "outputPricingUsd": 6
+        }
+      ]
+    },
+    "openai": {
+      "name": "OpenAI",
+      "pricingExtras": {
+        "webSearchUsdPerCall": 0.01,
+        "webSearchNonReasoningUsdPerCall": 0.025,
+        "cachedInputMultiplier": 0.1,
+        "batchDiscountMultiplier": 0.5,
+        "longContextInputTokenThreshold": 272000,
+        "longContextInputMultiplier": 2,
+        "longContextOutputMultiplier": 1.5,
+        "longContextModelIds": ["gpt-5.5"]
+      },
+      "defaultModelId": "gpt-5.4",
+      "models": [
+        {
+          "id": "gpt-5.4",
+          "label": "GPT-5.4",
+          "apiModelId": "gpt-5.4",
+          "reasoningMode": "toggle",
+          "webSearch": true,
+          "isReasoningModel": true,
+          "inputPricingUsd": 2.5,
+          "outputPricingUsd": 15
+        },
+        {
+          "id": "gpt-5.5",
+          "label": "GPT-5.5",
+          "apiModelId": "gpt-5.5",
+          "reasoningMode": "toggle",
+          "webSearch": true,
+          "isReasoningModel": true,
+          "inputPricingUsd": 5,
+          "outputPricingUsd": 30
         }
       ]
     }
