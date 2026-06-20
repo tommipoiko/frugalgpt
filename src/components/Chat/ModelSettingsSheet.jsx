@@ -7,7 +7,6 @@ import { getChatModelEntry } from '../../constants/availableModels'
 function ModelSettingsSheet({
     open,
     onClose,
-    isMobile,
     draftModelKey,
     onDraftModelChange,
     draftReasoning,
@@ -31,16 +30,13 @@ function ModelSettingsSheet({
 
     if (!open) return null
 
-    const draftEntry = entry || getChatModelEntry(draftModelKey)
+    const draftEntry = readOnly && entry ? entry : getChatModelEntry(draftModelKey)
     const showReasoningToggle = draftEntry.reasoningMode === 'toggle'
     const showWebToggle = draftEntry.webSearch === true
 
     const panelClassName = clsx(
-        'flex flex-col bg-[#f7f7f8] shadow-2xl dark:bg-[#0b0b0f]',
-        'w-full max-w-[min(920px,calc(100vw-2rem))]',
-        isMobile
-            ? 'h-[min(85vh,720px)] rounded-t-2xl border border-slate-200/80 pb-[max(12px,env(safe-area-inset-bottom,0px))] dark:border-white/[0.08]'
-            : 'max-h-[min(640px,90vh)] rounded-2xl border border-slate-200/80 dark:border-white/[0.08]'
+        'flex w-full flex-col bg-[#f7f7f8] shadow-2xl dark:bg-[#0b0b0f]',
+        'max-h-[min(85vh,720px)] rounded-2xl border border-slate-200/80 dark:border-white/[0.08]'
     )
 
     const panel = (
@@ -64,7 +60,7 @@ function ModelSettingsSheet({
                 </button>
             </div>
 
-            <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-4 py-4 sm:px-5">
+            <div className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain px-4 py-4 sm:px-5">
                 <label className="block">
                     <span className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-zinc-500">
                         Model
@@ -179,30 +175,9 @@ function ModelSettingsSheet({
         </div>
     )
 
-    if (isMobile) {
-        return (
-            <div
-                className="fixed inset-0 z-[1400] flex flex-col bg-black/50"
-                role="dialog"
-                aria-modal="true"
-                aria-labelledby="model-sheet-title"
-            >
-                <button
-                    type="button"
-                    className="absolute inset-0 z-0 cursor-default"
-                    aria-label="Dismiss overlay"
-                    onClick={onClose}
-                />
-                <div className="relative z-10 flex min-h-0 flex-1 items-end justify-center px-2 pt-[env(safe-area-inset-top)]">
-                    {panel}
-                </div>
-            </div>
-        )
-    }
-
     return (
         <div
-            className="fixed inset-0 z-[1400] flex items-center justify-center bg-black/45 p-4"
+            className="fixed inset-0 z-[1400] flex items-center justify-center bg-black/50 p-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))]"
             role="dialog"
             aria-modal="true"
             aria-labelledby="model-sheet-title"
@@ -213,7 +188,7 @@ function ModelSettingsSheet({
                 aria-label="Dismiss overlay"
                 onClick={onClose}
             />
-            <div className="relative z-10 flex w-full justify-center">
+            <div className="relative z-10 w-full max-w-[min(420px,calc(100vw-2rem))]">
                 {panel}
             </div>
         </div>

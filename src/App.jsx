@@ -71,7 +71,8 @@ function App() {
     useEffect(() => {
         if (!authReady) return
         const redirectPaths = ['chats', 'user']
-        if (!user && redirectPaths.includes(location.pathname.split('/')[1])) {
+        const section = location.pathname.split('/')[1]
+        if (!user && redirectPaths.includes(section) && location.pathname !== '/signin') {
             navigate(`/signin?redirect=${encodeURIComponent(location.pathname)}`)
         }
     }, [authReady, user, location.pathname, navigate])
@@ -112,7 +113,11 @@ function App() {
     const openUserPage = () => {
         setUserMenuOpen(false)
         closeDrawerOnMobile()
-        navigate('/user')
+        if (user) {
+            navigate('/user')
+        } else {
+            navigate('/signin?redirect=/user')
+        }
     }
 
     const handleNewChat = () => {

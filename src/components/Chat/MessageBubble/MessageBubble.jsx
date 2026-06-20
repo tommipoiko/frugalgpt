@@ -5,8 +5,7 @@ import {
     Sparkles, FileText, Copy, RotateCw, Pencil
 } from 'lucide-react'
 import clsx from 'clsx'
-import ReactMarkdown from 'react-markdown'
-import CodeBlock from './CodeBlock'
+import AssistantMarkdown from './AssistantMarkdown'
 import Sources from '../Sources'
 
 const LONG_PRESS_MS = 500
@@ -337,13 +336,9 @@ function MessageBubble({
             >
                 <Sparkles className="h-4 w-4" aria-hidden />
             </div>
-            <div className="w-full min-w-0 flex-1 break-words text-[0.95rem] leading-relaxed text-slate-900 dark:text-zinc-100 [&_a]:border-b [&_a]:border-brand-500/40 [&_a]:text-brand-600 [&_a]:no-underline hover:[&_a]:border-brand-500 dark:[&_a]:text-brand-400 [&_blockquote]:my-2 [&_blockquote]:border-l-[3px] [&_blockquote]:border-slate-200 [&_blockquote]:pl-4 [&_blockquote]:text-slate-600 dark:[&_blockquote]:border-zinc-600 dark:[&_blockquote]:text-zinc-400 [&_h1]:mb-2 [&_h1]:mt-4 [&_h1]:text-lg [&_h1]:font-semibold [&_h2]:mb-2 [&_h2]:mt-4 [&_h2]:text-base [&_h2]:font-semibold [&_li]:mb-1 [&_ol]:my-2 [&_ol]:pl-6 [&_p]:mb-3 [&_p]:last:mb-0 [&_ul]:my-2 [&_ul]:pl-6 [&_:not(pre)>code]:rounded-md [&_:not(pre)>code]:bg-slate-100 [&_:not(pre)>code]:px-1 [&_:not(pre)>code]:py-0.5 [&_:not(pre)>code]:font-mono [&_:not(pre)>code]:text-[0.85em] dark:[&_:not(pre)>code]:bg-white/[0.08]">
+            <div className="w-full min-w-0 flex-1 break-words text-[0.95rem] leading-relaxed text-slate-900 dark:text-zinc-100">
                 {message.content
-                    ? (
-                        <ReactMarkdown components={{ code: CodeBlock }}>
-                            {message.content}
-                        </ReactMarkdown>
-                    )
+                    ? <AssistantMarkdown content={message.content} />
                     : (
                         <div className="flex gap-1.5 py-2">
                             {[0, 1, 2].map((dot) => (

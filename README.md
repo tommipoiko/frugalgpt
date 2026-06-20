@@ -6,7 +6,7 @@ All provider API calls are executed on Firebase Cloud Functions, not in the brow
 
 ## Features
 
-- Email/password and Google sign-in with Firebase Auth
+- Google sign-in and passwordless email link sign-in with Firebase Auth
 - Chat history persisted per user in Firestore
 - Rename/delete/share chat threads from the sidebar
 - Markdown and code block rendering in assistant responses
@@ -56,3 +56,12 @@ Then run:
 firebase emulators:start --only functions
 npm start
 ```
+
+### Email link sign-in (Firebase Console)
+
+In **Authentication → Sign-in method**:
+
+1. Enable **Email/Password**
+2. Enable **Email link (passwordless sign-in)**
+
+In **Authentication → Settings → Authorized domains**, include your production domain and `localhost` for local dev.

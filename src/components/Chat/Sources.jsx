@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { Link2, ArrowLeft } from 'lucide-react'
+import { handleExternalLinkClick } from '../../utils/openExternalLink'
 
 const getDomain = (url) => {
     try {
@@ -25,13 +26,12 @@ function SourceChips({ sources }) {
                 const domain = getDomain(source.url)
                 const favicon = getFaviconUrl(source.url)
                 return (
-                    <a
+                    <button
+                        type="button"
                         // eslint-disable-next-line react/no-array-index-key
                         key={`${source.url}-${index}`}
-                        href={source.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex max-w-[min(320px,100%)] items-center gap-2 rounded-xl border border-slate-200/90 px-3 py-2 text-inherit no-underline transition hover:border-brand-500 dark:border-white/[0.08]"
+                        className="flex max-w-[min(320px,100%)] items-center gap-2 rounded-xl border border-slate-200/90 px-3 py-2 text-left text-inherit no-underline transition hover:border-brand-500 dark:border-white/[0.08]"
+                        onClick={(event) => handleExternalLinkClick(event, source.url)}
                     >
                         <span className="flex h-[22px] w-[22px] shrink-0 items-center justify-center overflow-hidden rounded-md bg-slate-100 dark:bg-white/[0.06]">
                             {favicon ? (
@@ -53,7 +53,7 @@ function SourceChips({ sources }) {
                                 {domain}
                             </span>
                         </span>
-                    </a>
+                    </button>
                 )
             })}
         </div>

@@ -5,21 +5,25 @@ import { CopyToClipboard } from 'react-copy-to-clipboard'
 import { Copy, Check } from 'lucide-react'
 
 function CodeBlock({
-    inline, className, children, ...props
+    className, children, ...props
 }) {
     const [copied, setCopied] = useState(false)
     const match = /language-(\w+)/.exec(className || '')
     const language = match ? match[1] : 'text'
     const code = String(children).replace(/\n$/, '')
+    const isBlock = Boolean(match) || code.includes('\n')
 
     const handleCopied = () => {
         setCopied(true)
         setTimeout(() => setCopied(false), 1400)
     }
 
-    if (inline || !match) {
+    if (!isBlock) {
         return (
-            <code className={className} {...props}>
+            <code
+                className="rounded-md bg-slate-100 px-1 py-0.5 font-mono text-[0.85em] text-slate-800 dark:bg-white/[0.08] dark:text-zinc-200"
+                {...props}
+            >
                 {children}
             </code>
         )

@@ -61,6 +61,7 @@ function Chat({ currentChat }) {
     const [currentMessage, setCurrentMessage] = useState('')
     const [attachments, setAttachments] = useState([])
     const [canSendMessages, setCanSendMessages] = useState(false)
+    const [currentUser, setCurrentUser] = useState(null)
     const [userSettingsLoaded, setUserSettingsLoaded] = useState(false)
     const [isSendingMessage, setIsSendingMessage] = useState(false)
     const [sendError, setSendError] = useState('')
@@ -157,6 +158,7 @@ function Chat({ currentChat }) {
         const unsubAuth = auth.onAuthStateChanged((user) => {
             unsubUser()
             unsubChat()
+            setCurrentUser(user)
             if (!user) {
                 setCanSendMessages(false)
                 setUserSettings(null)
@@ -661,6 +663,20 @@ function Chat({ currentChat }) {
         }
 
         if (!canSendMessages) {
+            if (!currentUser) {
+                return (
+                    <div className={composerStatusClass}>
+                        <p className="text-sm font-semibold text-slate-800 dark:text-zinc-200">
+                            Sign in to start chatting
+                        </p>
+                        <p className="mt-2 text-sm text-slate-600 dark:text-zinc-400">
+                            Bring your own API keys and talk to OpenAI, Anthropic, Google, and Mistral
+                            models — you stay in control of cost and choice.
+                        </p>
+                    </div>
+                )
+            }
+
             return (
                 <div className={composerStatusClass}>
                     <p className="text-sm text-slate-600 dark:text-zinc-400">
@@ -809,7 +825,6 @@ function Chat({ currentChat }) {
             <ModelSettingsSheet
                 open={modelSheetOpen}
                 onClose={() => setModelSheetOpen(false)}
-                isMobile={isMobileLayout}
                 draftModelKey={sheetDraftModelKey}
                 onDraftModelChange={handleSheetDraftModelKeyChange}
                 draftReasoning={sheetDraftReasoning}

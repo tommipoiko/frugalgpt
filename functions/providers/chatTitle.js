@@ -49,6 +49,29 @@ const buildTitlePrompt = (userMessage, assistantResponse) => (
     `${TITLE_INSTRUCTION}\n\nUser: ${excerpt(userMessage, 500) || '(attachment)'}\n\nAssistant: ${excerpt(assistantResponse, 400)}`
 )
 
+/** Title calls should stay cheap: no tools/web search and minimal reasoning only. */
+const buildOpenAiTitleCreateParams = (modelId, prompt) => ({
+    model: modelId,
+    input: prompt,
+    max_output_tokens: 32,
+    reasoning: { effort: 'minimal' }
+})
+
+const buildGeminiTitleConfig = () => ({
+    maxOutputTokens: 32,
+    temperature: 0.3
+})
+
+const buildMistralTitleBody = (modelId, prompt) => ({
+    model: modelId,
+    messages: [{
+        role: 'user',
+        content: prompt
+    }],
+    max_tokens: 32,
+    temperature: 0.3
+})
+
 const extractOpenAiResponseText = (response) => {
     if (typeof response?.output_text === 'string' && response.output_text.trim()) {
         return response.output_text
@@ -66,11 +89,10 @@ const extractOpenAiResponseText = (response) => {
 
 const generateOpenAiTitle = async ({ apiKey, modelId, userMessage, assistantResponse }) => {
     const client = new OpenAI({ apiKey })
-    const response = await client.responses.create({
-        model: modelId,
-        input: buildTitlePrompt(userMessage, assistantResponse),
-        max_output_tokens: 32
-    })
+    const prompt = buildTitlePrompt(userMessage, assistantResponse)
+    const response = await client.responses.create(
+        buildOpenAiTitleCreateParams(modelId, prompt)
+    )
     return sanitizeChatTitle(extractOpenAiResponseText(response))
 }
 
@@ -96,15 +118,13 @@ const generateGeminiTitle = async ({ apiKey, modelId, userMessage, assistantResp
     const response = await ai.models.generateContent({
         model: modelId,
         contents: buildTitlePrompt(userMessage, assistantResponse),
-        config: {
-            maxOutputTokens: 32,
-            temperature: 0.3
-        }
+        config: buildGeminiTitleConfig()
     })
     return sanitizeChatTitle(response.text)
 }
 
 const generateMistralTitle = async ({ apiKey, modelId, userMessage, assistantResponse }) => {
+    const prompt = buildTitlePrompt(userMessage, assistantResponse)
     const response = await fetch(`${MISTRAL_API_BASE}/chat/completions`, {
         method: 'POST',
         headers: {
@@ -112,15 +132,7 @@ const generateMistralTitle = async ({ apiKey, modelId, userMessage, assistantRes
             'Content-Type': 'application/json',
             Accept: 'application/json'
         },
-        body: JSON.stringify({
-            model: modelId,
-            messages: [{
-                role: 'user',
-                content: buildTitlePrompt(userMessage, assistantResponse)
-            }],
-            max_tokens: 32,
-            temperature: 0.3
-        })
+        body: JSON.stringify(buildMistralTitleBody(modelId, prompt))
     })
 
     if (!response.ok) {
@@ -167,6 +179,9 @@ const generateChatTitle = async ({
 
 module.exports = {
     buildTitlePrompt,
+    buildOpenAiTitleCreateParams,
+    buildGeminiTitleConfig,
+    buildMistralTitleBody,
     generateChatTitle,
     isFirstExchange,
     sanitizeChatTitle

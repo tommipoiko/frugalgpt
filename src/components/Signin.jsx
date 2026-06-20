@@ -1,30 +1,78 @@
 import React, { useEffect, useState } from 'react'
-import { signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider } from 'firebase/auth'
-import { useNavigate, Link } from 'react-router-dom'
+import {
+    sendSignInLinkToEmail,
+    isSignInWithEmailLink,
+    signInWithEmailLink,
+    signInWithPopup,
+    GoogleAuthProvider
+} from 'firebase/auth'
+import { useNavigate } from 'react-router-dom'
 import { auth } from '../services/firebase'
 import BrandMark from './Brand/BrandMark'
 import { brandGradient } from '../theme'
 import useKeyboardOverlapBottom from '../hooks/useKeyboardOverlapBottom'
 
+const EMAIL_FOR_SIGN_IN_KEY = 'frugalGptEmailForSignIn'
+
 function Signin() {
     const keyboardInset = useKeyboardOverlapBottom()
     const [email, setEmail] = useState('')
-    const [password, setPassword] = useState('')
     const [error, setError] = useState('')
+    const [linkSent, setLinkSent] = useState(false)
+    const [completingLink, setCompletingLink] = useState(
+        () => isSignInWithEmailLink(auth, window.location.href)
+    )
     const navigate = useNavigate()
     const redirectParam = new URLSearchParams(window.location.search).get('redirect')
 
     useEffect(() => {
-        if (redirectParam) {
-            setError('You need to sign in to access this page')
-        }
-    }, [redirectParam])
+        const completeEmailLinkSignIn = async () => {
+            if (!isSignInWithEmailLink(auth, window.location.href)) return
 
-    const handleSignin = async () => {
+            setCompletingLink(true)
+            setError('')
+
+            let emailForSignIn = window.localStorage.getItem(EMAIL_FOR_SIGN_IN_KEY)
+            if (!emailForSignIn) {
+                emailForSignIn = window.prompt('Please enter your email to confirm sign-in')
+            }
+            if (!emailForSignIn) {
+                setError('Email is required to complete sign-in')
+                setCompletingLink(false)
+                return
+            }
+
+            try {
+                await signInWithEmailLink(auth, emailForSignIn, window.location.href)
+                window.localStorage.removeItem(EMAIL_FOR_SIGN_IN_KEY)
+                navigate(redirectParam || '/')
+            } catch (err) {
+                setError(err.message)
+                setCompletingLink(false)
+            }
+        }
+
+        completeEmailLinkSignIn()
+    }, [navigate, redirectParam])
+
+    const handleEmailLinkSignin = async () => {
+        setError('')
+        setLinkSent(false)
+
+        const continueUrl = new URL('/signin', window.location.origin)
+        if (redirectParam) {
+            continueUrl.searchParams.set('redirect', redirectParam)
+        }
+
+        const actionCodeSettings = {
+            url: continueUrl.toString(),
+            handleCodeInApp: true
+        }
+
         try {
-            await signInWithEmailAndPassword(auth, email, password)
-            const redirectTo = new URLSearchParams(window.location.search).get('redirect')
-            navigate(redirectTo || '/')
+            await sendSignInLinkToEmail(auth, email, actionCodeSettings)
+            window.localStorage.setItem(EMAIL_FOR_SIGN_IN_KEY, email)
+            setLinkSent(true)
         } catch (err) {
             setError(err.message)
         }
@@ -34,8 +82,7 @@ function Signin() {
         const provider = new GoogleAuthProvider()
         try {
             await signInWithPopup(auth, provider)
-            const redirectTo = new URLSearchParams(window.location.search).get('redirect')
-            navigate(redirectTo || '/')
+            navigate(redirectParam || '/')
         } catch (err) {
             setError(err.message)
         }
@@ -68,71 +115,67 @@ function Signin() {
                             {error}
                         </div>
                     )}
-                    <form
-                        className="flex flex-col gap-4"
-                        onSubmit={(event) => {
-                            event.preventDefault()
-                            handleSignin()
-                        }}
-                    >
-                        <label className="block text-sm font-medium text-slate-700 dark:text-zinc-300">
-                            <span className="block">Email</span>
-                            <input
-                                type="email"
-                                autoComplete="email"
-                                value={email}
-                                onChange={(e) => setEmail(e.target.value)}
-                                className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-base dark:border-white/10 dark:bg-zinc-800"
-                            />
-                        </label>
-                        <label className="block text-sm font-medium text-slate-700 dark:text-zinc-300">
-                            <span className="block">Password</span>
-                            <input
-                                type="password"
-                                autoComplete="current-password"
-                                value={password}
-                                onChange={(e) => setPassword(e.target.value)}
-                                className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-base dark:border-white/10 dark:bg-zinc-800"
-                            />
-                        </label>
-                        <button
-                            type="submit"
-                            className="mt-1 w-full rounded-[10px] py-3 text-base font-semibold text-white"
-                            style={{ backgroundImage: brandGradient }}
-                        >
-                            Sign in
-                        </button>
-                    </form>
-                    <div className="relative my-8">
-                        <div className="absolute inset-0 flex items-center">
-                            <div className="w-full border-t border-slate-200 dark:border-white/10" />
+                    {linkSent && (
+                        <div className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900 dark:border-emerald-900/50 dark:bg-emerald-950/40 dark:text-emerald-200">
+                            Check your inbox for a sign-in link. It may take a minute to arrive.
                         </div>
-                        <div className="relative flex justify-center text-xs uppercase tracking-wide">
-                            <span className="bg-white px-2 text-slate-500 dark:bg-zinc-900 dark:text-zinc-400">
-                                OR
-                            </span>
-                        </div>
-                    </div>
-                    <button
-                        type="button"
-                        onClick={handleGoogleSignin}
-                        className="flex w-full items-center justify-center gap-2 rounded-[10px] border border-slate-200 py-3 text-sm font-semibold dark:border-white/10"
-                    >
-                        <span className="font-bold text-blue-600">G</span>
-                        Continue with Google
-                    </button>
-                    <p className="mt-8 text-center text-sm text-slate-600 dark:text-zinc-400">
-                        New here?
-                        {' '}
-                        <Link
-                            to={`/signup${redirectParam
-                                ? `?redirect=${encodeURIComponent(redirectParam)}`
-                                : ''}`}
-                            className="font-semibold text-emerald-600 hover:underline dark:text-emerald-400"
-                        >
-                            Create an account
-                        </Link>
-                    </p>
+                    )}
+                    {completingLink ? (
+                        <p className="text-center text-sm text-slate-600 dark:text-zinc-400">
+                            Completing sign-in…
+                        </p>
+                    ) : (
+                        <>
+                            <button
+                                type="button"
+                                onClick={handleGoogleSignin}
+                                className="flex w-full items-center justify-center gap-2 rounded-[10px] border border-slate-200 py-3 text-sm font-semibold dark:border-white/10"
+                            >
+                                <span className="font-bold text-blue-600">G</span>
+                                Continue with Google
+                            </button>
+                            <div className="relative my-8">
+                                <div className="absolute inset-0 flex items-center">
+                                    <div className="w-full border-t border-slate-200 dark:border-white/10" />
+                                </div>
+                                <div className="relative flex justify-center text-xs uppercase tracking-wide">
+                                    <span className="bg-white px-2 text-slate-500 dark:bg-zinc-900 dark:text-zinc-400">
+                                        OR
+                                    </span>
+                                </div>
+                            </div>
+                            <form
+                                className="flex flex-col gap-4"
+                                onSubmit={(event) => {
+                                    event.preventDefault()
+                                    handleEmailLinkSignin()
+                                }}
+                            >
+                                <label className="block text-sm font-medium text-slate-700 dark:text-zinc-300">
+                                    <span className="block">Email</span>
+                                    <input
+                                        type="email"
+                                        autoComplete="email"
+                                        value={email}
+                                        onChange={(e) => setEmail(e.target.value)}
+                                        className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-base dark:border-white/10 dark:bg-zinc-800"
+                                    />
+                                </label>
+                                <button
+                                    type="submit"
+                                    className="mt-1 w-full rounded-[10px] py-3 text-base font-semibold text-white"
+                                    style={{ backgroundImage: brandGradient }}
+                                >
+                                    Email me a sign-in link
+                                </button>
+                            </form>
+                            <p className="mt-8 text-center text-sm text-slate-600 dark:text-zinc-400">
+                                New here? Enter your email and we&apos;ll create your account when you
+                                {' '}
+                                open the link.
+                            </p>
+                        </>
+                    )}
                 </div>
             </div>
         </div>

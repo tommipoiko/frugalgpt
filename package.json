@@ -11,6 +11,7 @@
     "eslint": "^8.57.0",
     "firebase": "^10.13.0",
     "firebase-functions": "^7.2.5",
+    "katex": "^0.17.0",
     "lucide-react": "^1.14.0",
     "react": "^18.3.1",
     "react-copy-to-clipboard": "^5.1.0",
@@ -19,6 +20,9 @@
     "react-router-dom": "^6.26.1",
     "react-scripts": "5.0.1",
     "react-syntax-highlighter": "^15.5.0",
+    "rehype-katex": "^7.0.1",
+    "remark-gfm": "^4.0.1",
+    "remark-math": "^6.0.0",
     "simple-icons": "^16.18.0",
     "web-vitals": "^2.1.4"
   },
