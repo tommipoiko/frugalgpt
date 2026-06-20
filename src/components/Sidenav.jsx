@@ -11,7 +11,8 @@ import {
 } from 'lucide-react'
 import clsx from 'clsx'
 import {
-    collection, query, orderBy, onSnapshot, where, doc, updateDoc, deleteDoc
+    collection, query, orderBy, onSnapshot, where, doc, updateDoc, deleteDoc,
+    Timestamp, limit
 } from 'firebase/firestore'
 import { db } from '../services/firebase'
 import { brandGradient } from '../theme'
@@ -22,6 +23,7 @@ const groupChatsByRecency = (chats) => {
     const groups = {
         Today: [],
         'Previous 7 days': [],
+        'Previous 2 weeks': [],
         'Previous 30 days': [],
         Older: []
     }
@@ -35,6 +37,7 @@ const groupChatsByRecency = (chats) => {
         const ageDays = lastUpdated ? (now - lastUpdated) / dayMs : Infinity
         if (ageDays < 1) groups.Today.push(chat)
         else if (ageDays < 7) groups['Previous 7 days'].push(chat)
+        else if (ageDays < 14) groups['Previous 2 weeks'].push(chat)
         else if (ageDays < 30) groups['Previous 30 days'].push(chat)
         else groups.Older.push(chat)
     })
@@ -43,6 +46,11 @@ const groupChatsByRecency = (chats) => {
 }
 
 const TAP_MOVE_THRESHOLD_PX = 10
+const CHAT_HISTORY_DAYS = 60
+
+const getChatHistoryCutoff = () => Timestamp.fromDate(
+    new Date(Date.now() - CHAT_HISTORY_DAYS * 24 * 60 * 60 * 1000)
+)
 
 function Sidenav({ user, onNavigateChat, currentChatId }) {
     const [chats, setChats] = useState([])
@@ -57,6 +65,8 @@ function Sidenav({ user, onNavigateChat, currentChatId }) {
     const [openRenameDialog, setOpenRenameDialog] = useState(false)
     const [openShareDialog, setOpenShareDialog] = useState(false)
     const [shareChatLink, setShareChatLink] = useState('')
+    const [showOlderChats, setShowOlderChats] = useState(false)
+    const [hasOlderChats, setHasOlderChats] = useState(false)
     const touchStartRef = useRef(null)
     const suppressRowClickRef = useRef(false)
 
@@ -109,11 +119,17 @@ function Sidenav({ user, onNavigateChat, currentChatId }) {
             setChats([])
             return undefined
         }
-        const q = query(
-            collection(db, 'chats'),
+
+        const cutoff = getChatHistoryCutoff()
+        const constraints = [
             where('userId', '==', user.uid),
             orderBy('lastUpdated', 'desc')
-        )
+        ]
+        if (!showOlderChats) {
+            constraints.splice(1, 0, where('lastUpdated', '>=', cutoff))
+        }
+
+        const q = query(collection(db, 'chats'), ...constraints)
         const unsubscribe = onSnapshot(q, (snapshot) => {
             const chatList = snapshot.docs.map((document) => ({
                 id: document.id,
@@ -122,7 +138,27 @@ function Sidenav({ user, onNavigateChat, currentChatId }) {
             setChats(chatList)
         })
         return () => unsubscribe()
-    }, [user])
+    }, [user, showOlderChats])
+
+    useEffect(() => {
+        if (!user || showOlderChats) {
+            setHasOlderChats(false)
+            return undefined
+        }
+
+        const cutoff = getChatHistoryCutoff()
+        const probeQuery = query(
+            collection(db, 'chats'),
+            where('userId', '==', user.uid),
+            where('lastUpdated', '<', cutoff),
+            orderBy('lastUpdated', 'desc'),
+            limit(1)
+        )
+        const unsubscribe = onSnapshot(probeQuery, (snapshot) => {
+            setHasOlderChats(!snapshot.empty)
+        })
+        return () => unsubscribe()
+    }, [user, showOlderChats])
 
     const grouped = useMemo(() => groupChatsByRecency(chats), [chats])
 
@@ -271,20 +307,33 @@ function Sidenav({ user, onNavigateChat, currentChatId }) {
                 </button>
             </div>
             <div className="mx-4 h-px shrink-0 bg-slate-200/80 dark:bg-white/[0.06]" />
-            <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-x-none overscroll-y-contain touch-pan-y pb-4 pt-2 [-webkit-overflow-scrolling:touch]">
-                {chats.length === 0 ? (
+            <div className="scrollbar-none min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-x-none overscroll-y-contain touch-pan-y pb-4 pt-2 [-webkit-overflow-scrolling:touch]">
+                {chats.length === 0 && !hasOlderChats ? (
                     <div className="px-4 py-8 text-center text-sm text-slate-500 dark:text-zinc-400">
                         Your chats will appear here.
                     </div>
                 ) : (
-                    grouped.map(([label, items]) => (
-                        <div key={label} className="mb-2">
-                            <span className="block px-4 pb-1 pt-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-zinc-500">
-                                {label}
-                            </span>
-                            <ul>{items.map(renderChatRow)}</ul>
-                        </div>
-                    ))
+                    <>
+                        {grouped.map(([label, items]) => (
+                            <div key={label} className="mb-2">
+                                <span className="block px-4 pb-1 pt-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-zinc-500">
+                                    {label}
+                                </span>
+                                <ul>{items.map(renderChatRow)}</ul>
+                            </div>
+                        ))}
+                        {hasOlderChats && !showOlderChats && (
+                            <div className="px-4 pt-2">
+                                <button
+                                    type="button"
+                                    onClick={() => setShowOlderChats(true)}
+                                    className="w-full rounded-[10px] py-2 text-sm font-medium text-slate-600 hover:bg-black/[0.04] dark:text-zinc-400 dark:hover:bg-white/[0.06]"
+                                >
+                                    Show older
+                                </button>
+                            </div>
+                        )}
+                    </>
                 )}
             </div>
 

@@ -513,7 +513,7 @@ function Chat({ currentChat }) {
             <div
                 ref={listRef}
                 onScroll={handleScroll}
-                className="flex min-h-0 flex-1 flex-col items-center overflow-y-scroll overflow-x-hidden overscroll-y-contain [scrollbar-gutter:stable]"
+                className="scrollbar-none flex min-h-0 flex-1 flex-col items-center overflow-y-auto overflow-x-hidden overscroll-y-contain"
             >
                 <div className={clsx(threadWidth, 'flex min-w-0 flex-col gap-8 px-4 pb-4 pt-6 sm:px-6 sm:pt-8')}>
                     {isEmpty && (
@@ -638,7 +638,7 @@ function Chat({ currentChat }) {
                                     onChange={(e) => setCurrentMessage(e.target.value)}
                                     onKeyDown={handleKeyDown}
                                     disabled={!canSendMessages}
-                                    className="order-1 max-h-[240px] min-h-[44px] w-full min-w-0 resize-none overflow-y-auto border-0 bg-transparent px-2 py-2.5 text-[max(16px,0.95rem)] leading-relaxed text-slate-900 outline-none placeholder:text-slate-400 min-[600px]:order-3 min-[600px]:flex-1 min-[600px]:px-1 dark:text-zinc-100 dark:placeholder:text-zinc-500"
+                                    className="scrollbar-none order-1 max-h-[240px] min-h-[44px] w-full min-w-0 resize-none overflow-y-auto border-0 bg-transparent px-2 py-2.5 text-[max(16px,0.95rem)] leading-relaxed text-slate-900 outline-none placeholder:text-slate-400 min-[600px]:order-3 min-[600px]:flex-1 min-[600px]:px-1 dark:text-zinc-100 dark:placeholder:text-zinc-500"
                                 />
                                 <div className="order-2 flex w-full items-center justify-between gap-2 min-[600px]:contents">
                                     <div className="flex items-center gap-1 min-[600px]:contents">
