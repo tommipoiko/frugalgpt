@@ -81,6 +81,8 @@ const sendMessage = async (
         provider = 'openai',
         model,
         modelKey = null,
+        modelLabel = null,
+        providerLabel = null,
         reasoningEnabled = true,
         webSearchEnabled = true,
         inferenceForDoc = null,
@@ -251,7 +253,9 @@ const sendMessage = async (
         ...(typeof turnCostUsd === 'number' ? { costUsd: turnCostUsd } : {}),
         ...(turnCostSource ? { costSource: turnCostSource } : {}),
         ...(turnCostBreakdown ? { costBreakdown: omitUndefinedKeys(turnCostBreakdown) } : {}),
-        ...(typeof modelKey === 'string' && modelKey.trim() ? { modelKey: modelKey.trim() } : {}),
+        ...(typeof modelKey === 'string' && modelKey.trim()
+            ? { modelKey: modelKey.trim() }
+            : {}),
         provider,
         ...(model ? { model } : {}),
         costRecordedAt: new Date().toISOString()
@@ -268,7 +272,15 @@ const sendMessage = async (
     const inferenceFields = {
         provider,
         model: model || null,
-        ...(typeof modelKey === 'string' && modelKey.trim() ? { modelKey: modelKey.trim() } : {}),
+        ...(typeof modelKey === 'string' && modelKey.trim()
+            ? { modelKey: modelKey.trim() }
+            : {}),
+        ...(typeof modelLabel === 'string' && modelLabel.trim()
+            ? { modelLabel: modelLabel.trim() }
+            : {}),
+        ...(typeof providerLabel === 'string' && providerLabel.trim()
+            ? { providerLabel: providerLabel.trim() }
+            : {}),
         reasoningEnabled: persistReasoning,
         webSearchEnabled: persistWeb
     }

@@ -1,23 +1,53 @@
-import { AVAILABLE_CHAT_MODELS } from './availableModels'
-import catalog from '../../models.json'
+import {
+    buildLegacyModelEntry,
+    findCatalogModel,
+    getChatModelEntry,
+    resolveChatInferenceFromFirestore,
+    resolveModelKeyFromFirestore
+} from './availableModels'
 
-describe('AVAILABLE_CHAT_MODELS web search support', () => {
-    it('contains exactly the required model ids', () => {
-        const expectedKeys = Object.values(catalog.providers).flatMap(
-            (provider) => provider.models.map((model) => model.id)
-        )
-        expect(AVAILABLE_CHAT_MODELS.map((model) => model.key)).toEqual(expectedKeys)
+describe('chat model persistence helpers', () => {
+    it('finds catalog models by provider and api id', () => {
+        const entry = findCatalogModel({
+            provider: 'openai',
+            model: 'gpt-5.4'
+        })
+        expect(entry?.key).toBe('gpt-5.4')
     })
 
-    it('keeps API model ids equal to UI keys', () => {
-        AVAILABLE_CHAT_MODELS.forEach((model) => {
-            expect(model.apiModelId).toBe(model.key)
+    it('resolves legacy chat inference when model is removed from catalog', () => {
+        const inference = resolveChatInferenceFromFirestore({
+            provider: 'openai',
+            model: 'gpt-4o',
+            modelKey: 'gpt-4o',
+            modelLabel: 'GPT-4o',
+            providerLabel: 'OpenAI',
+            reasoningEnabled: true,
+            webSearchEnabled: false
         })
+
+        expect(inference?.isLegacy).toBe(true)
+        expect(inference?.modelKey).toBe('gpt-4o')
+        expect(inference?.entry.apiModelId).toBe('gpt-4o')
     })
 
-    it('enables web search for every listed model', () => {
-        AVAILABLE_CHAT_MODELS.forEach((model) => {
-            expect(model.webSearch).toBe(true)
+    it('keeps stored model key even when it is not in the catalog', () => {
+        expect(resolveModelKeyFromFirestore({
+            modelKey: 'retired-model',
+            provider: 'anthropic',
+            model: 'retired-model'
+        })).toBe('retired-model')
+    })
+
+    it('uses fallback entry for removed models in getChatModelEntry', () => {
+        const legacy = buildLegacyModelEntry({
+            modelKey: 'retired-model',
+            provider: 'google',
+            model: 'retired-model',
+            modelLabel: 'Retired Model'
         })
+        const entry = getChatModelEntry('retired-model', legacy)
+        expect(entry.label).toBe('Retired Model')
+        expect(entry.isLegacy).toBe(true)
     })
 })

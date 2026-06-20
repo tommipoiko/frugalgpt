@@ -57,6 +57,27 @@ const listRequiredModelsForProvider = (provider) => (
 
 const isAllowedModel = (provider, modelId) => listRequiredModelsForProvider(provider).includes(modelId)
 
+const isPlausibleModelId = (modelId) => (
+    typeof modelId === 'string'
+    && modelId.trim().length > 0
+    && modelId.trim().length <= 128
+    && /^[a-zA-Z0-9._-]+$/.test(modelId.trim())
+)
+
+const resolveRequestModel = (provider, requestedModel) => {
+    if (typeof requestedModel !== 'string' || !requestedModel.trim()) {
+        return sanitizeModelId(provider, undefined)
+    }
+    const normalized = requestedModel.trim()
+    if (isAllowedModel(provider, normalized)) {
+        return normalized
+    }
+    if (isPlausibleModelId(normalized)) {
+        return normalized
+    }
+    return sanitizeModelId(provider, undefined)
+}
+
 const sanitizeModelId = (provider, requestedModel) => {
     if (typeof requestedModel !== 'string' || !requestedModel.trim()) {
         return DEFAULT_MODEL_BY_PROVIDER[provider]
@@ -116,6 +137,8 @@ module.exports = {
     PROVIDERS,
     listRequiredModelsForProvider,
     isAllowedModel,
+    isPlausibleModelId,
+    resolveRequestModel,
     sanitizeModelId,
     getProviderPricingExtras,
     getModelPricing

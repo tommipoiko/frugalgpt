@@ -16,6 +16,7 @@ function ModelSettingsSheet({
     onDraftWebSearchChange,
     onApply,
     readOnly = false,
+    entry = null,
     /** Allowed catalog rows for this user */
     models
 }) {
@@ -30,7 +31,7 @@ function ModelSettingsSheet({
 
     if (!open) return null
 
-    const draftEntry = getChatModelEntry(draftModelKey)
+    const draftEntry = entry || getChatModelEntry(draftModelKey)
     const showReasoningToggle = draftEntry.reasoningMode === 'toggle'
     const showWebToggle = draftEntry.webSearch === true
 
@@ -70,19 +71,38 @@ function ModelSettingsSheet({
                     </span>
                     <div className="mt-1.5 flex items-center gap-2.5">
                         <ProviderLogo provider={draftEntry.provider} size={22} />
-                        <select
-                            value={draftModelKey}
-                            disabled={models.length === 0 || readOnly}
-                            onChange={(e) => onDraftModelChange(e.target.value)}
-                            className="min-w-0 flex-1 rounded-xl border border-slate-200/90 bg-white px-3 py-2.5 text-sm font-medium text-slate-900 dark:border-white/[0.12] dark:bg-zinc-900 dark:text-zinc-100"
-                        >
-                            {models.map((m) => (
-                                <option key={m.key} value={m.key}>
-                                    {m.label}
-                                </option>
-                            ))}
-                        </select>
+                        {readOnly ? (
+                            <div className="min-w-0 flex-1">
+                                <p className="text-sm font-medium text-slate-900 dark:text-zinc-100">
+                                    {draftEntry.label}
+                                </p>
+                                <p className="text-xs text-slate-500 dark:text-zinc-400">
+                                    {draftEntry.providerLabel || draftEntry.provider}
+                                    {' · '}
+                                    {draftEntry.apiModelId}
+                                </p>
+                            </div>
+                        ) : (
+                            <select
+                                value={draftModelKey}
+                                disabled={models.length === 0}
+                                onChange={(e) => onDraftModelChange(e.target.value)}
+                                className="min-w-0 flex-1 rounded-xl border border-slate-200/90 bg-white px-3 py-2.5 text-sm font-medium text-slate-900 dark:border-white/[0.12] dark:bg-zinc-900 dark:text-zinc-100"
+                            >
+                                {models.map((m) => (
+                                    <option key={m.key} value={m.key}>
+                                        {m.label}
+                                    </option>
+                                ))}
+                            </select>
+                        )}
                     </div>
+                    {readOnly && draftEntry.isLegacy && (
+                        <p className="mt-2 text-xs text-amber-700 dark:text-amber-300">
+                            This model is no longer listed in FrugalGPT, but this chat keeps using
+                            the saved API model id.
+                        </p>
+                    )}
                     {models.length === 0 && (
                         <p className="mt-2 text-xs text-amber-700 dark:text-amber-300">
                             Add an API key for at least one provider in settings to use models.

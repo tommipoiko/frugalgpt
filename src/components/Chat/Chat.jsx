@@ -19,11 +19,13 @@ import useIsMobile from '../../hooks/useIsMobile'
 import { summarizeAttachmentsForStore } from '../../utils/attachmentParts'
 import { buildChatCostTooltip, formatChatCostUsd, summarizeChatCost } from '../../utils/chatCost'
 import {
+    buildInferenceDocFields,
     defaultModelKeyForUser,
     getChatModelEntry,
     listChatModelsForUser,
-    resolveModelKeyFromFirestore
+    resolveChatInferenceFromFirestore
 } from '../../constants/availableModels'
+import { formatChatModelError } from '../../utils/chatModelErrors'
 
 const MAX_ATTACHMENT_SLOTS = 5
 const COMPOSER_MAX_HEIGHT = 240
@@ -65,6 +67,8 @@ function Chat({ currentChat }) {
     const [activityState, setActivityState] = useState(null)
     const [chatName, setChatName] = useState('')
     const [userSettings, setUserSettings] = useState(null)
+    const [chatInference, setChatInference] = useState(null)
+    const chatInferenceRef = useRef(null)
     const userSettingsRef = useRef(null)
     const [selectedModelKey, setSelectedModelKey] = useState(() => {
         try {
@@ -100,6 +104,7 @@ function Chat({ currentChat }) {
     const isExistingChat = Boolean(id || currentChat)
 
     userSettingsRef.current = userSettings
+    chatInferenceRef.current = chatInference
     attachmentsRef.current = attachments
 
     const modelsAllowed = useMemo(
@@ -107,7 +112,10 @@ function Chat({ currentChat }) {
         [userSettings]
     )
 
-    const selectedEntry = useMemo(() => getChatModelEntry(selectedModelKey), [selectedModelKey])
+    const selectedEntry = useMemo(
+        () => getChatModelEntry(selectedModelKey, chatInference?.entry),
+        [selectedModelKey, chatInference]
+    )
     const { provider } = selectedEntry
 
     useEffect(() => () => {
@@ -121,6 +129,7 @@ function Chat({ currentChat }) {
     }, [chatName])
 
     useEffect(() => {
+        if (id) return
         try {
             const raw = localStorage.getItem('frugalGptChatDefaults')
             if (raw) {
@@ -132,7 +141,7 @@ function Chat({ currentChat }) {
         } catch {
             // ignore
         }
-    }, [])
+    }, [id])
 
     useEffect(() => {
         localStorage.setItem('frugalGptChatDefaults', JSON.stringify({
@@ -181,23 +190,24 @@ function Chat({ currentChat }) {
                         const data = snapshot.data()
                         setMessages(data.messages || [])
                         setChatName(data.name || '')
-                        const us = userSettingsRef.current
-                        const allowed = listChatModelsForUser((pid) => hasProviderKey(us, pid))
-                        const resolved = resolveModelKeyFromFirestore({
-                            modelKey: data.modelKey,
-                            provider: data.provider,
-                            model: data.model
-                        })
-                        let nextKey = resolved
-                        if (!nextKey || !allowed.some((m) => m.key === nextKey)) {
-                            nextKey = defaultModelKeyForUser((pid) => hasProviderKey(us, pid))
-                        }
-                        setSelectedModelKey(nextKey)
-                        if (typeof data.reasoningEnabled === 'boolean') {
-                            setReasoningEnabled(data.reasoningEnabled)
-                        }
-                        if (typeof data.webSearchEnabled === 'boolean') {
-                            setWebSearchEnabled(data.webSearchEnabled)
+                        const inference = resolveChatInferenceFromFirestore(data)
+                        if (inference) {
+                            setChatInference(inference)
+                            setSelectedModelKey(inference.modelKey)
+                            if (typeof inference.reasoningEnabled === 'boolean') {
+                                setReasoningEnabled(inference.reasoningEnabled)
+                            }
+                            if (typeof inference.webSearchEnabled === 'boolean') {
+                                setWebSearchEnabled(inference.webSearchEnabled)
+                            }
+                        } else {
+                            setChatInference(null)
+                            const us = userSettingsRef.current
+                            if (us) {
+                                setSelectedModelKey(defaultModelKeyForUser(
+                                    (pid) => hasProviderKey(us, pid)
+                                ))
+                            }
                         }
                     } else {
                         navigate('/')
@@ -206,6 +216,7 @@ function Chat({ currentChat }) {
             } else {
                 setMessages([])
                 setChatName('')
+                setChatInference(null)
             }
         })
         return () => {
@@ -222,12 +233,8 @@ function Chat({ currentChat }) {
         if (typeof d.modelKey === 'string' && allowed.some((m) => m.key === d.modelKey)) {
             setSelectedModelKey(d.modelKey)
         } else if (typeof d.provider === 'string' && typeof d.model === 'string') {
-            const rk = resolveModelKeyFromFirestore({
-                modelKey: d.modelKey,
-                provider: d.provider,
-                model: d.model
-            })
-            if (rk && allowed.some((m) => m.key === rk)) setSelectedModelKey(rk)
+            const inference = resolveChatInferenceFromFirestore(d)
+            if (inference) setSelectedModelKey(inference.modelKey)
         }
         if (typeof d.reasoningEnabled === 'boolean') {
             setReasoningEnabled(d.reasoningEnabled)
@@ -238,11 +245,12 @@ function Chat({ currentChat }) {
     }, [id, userSettings])
 
     useEffect(() => {
+        if (id || currentChat) return
         if (!userSettings) return
         if (modelsAllowed.some((m) => m.key === selectedModelKey)) return
         const fb = defaultModelKeyForUser((pid) => hasProviderKey(userSettings, pid))
         setSelectedModelKey(fb)
-    }, [userSettings, modelsAllowed, selectedModelKey])
+    }, [id, currentChat, userSettings, modelsAllowed, selectedModelKey])
 
     useEffect(() => {
         if (modelSheetOpen && !prevSheetOpen.current) {
@@ -305,29 +313,32 @@ function Chat({ currentChat }) {
         setWebSearchEnabled(nextW)
         const pr = persistReasoningForDoc(e, nextR)
         const pw = persistWebForDoc(e, nextW)
+        const inferenceDoc = buildInferenceDocFields(e, {
+            reasoningEnabled: pr,
+            webSearchEnabled: pw
+        })
         localStorage.setItem('frugalGptChatDefaults', JSON.stringify({
             modelKey: mk,
             reasoningEnabled: nextR,
             webSearchEnabled: nextW
         }))
         try {
-            await chatApi.saveUserChatDefaults({
-                modelKey: mk,
-                provider: e.provider,
-                model: e.apiModelId,
-                reasoningEnabled: pr,
-                webSearchEnabled: pw
-            })
+            await chatApi.saveUserChatDefaults(inferenceDoc)
         } catch {
             // non-blocking
         }
         const chatKey = id || currentChat
         if (chatKey) {
             try {
-                await chatApi.updateChatInferenceDoc(chatKey, {
+                await chatApi.updateChatInferenceDoc(chatKey, inferenceDoc)
+                setChatInference({
                     modelKey: mk,
+                    entry: e,
+                    isLegacy: e.isLegacy === true,
                     provider: e.provider,
                     model: e.apiModelId,
+                    modelLabel: e.label,
+                    providerLabel: e.providerLabel,
                     reasoningEnabled: pr,
                     webSearchEnabled: pw
                 })
@@ -435,6 +446,8 @@ function Chat({ currentChat }) {
                     provider: selectedEntry.provider,
                     model: selectedEntry.apiModelId,
                     modelKey: selectedModelKey,
+                    modelLabel: selectedEntry.label,
+                    providerLabel: selectedEntry.providerLabel,
                     reasoningEnabled: effectiveReasoningRequest,
                     webSearchEnabled: effectiveWebRequest,
                     inferenceForDoc: {
@@ -455,7 +468,16 @@ function Chat({ currentChat }) {
                 navigate(`/chats/${chatId}`, { replace: true })
             }
         } catch (error) {
-            setSendError(error.message || 'Failed to send message. Please try again.')
+            setSendError(formatChatModelError(
+                error.message,
+                chatInferenceRef.current || {
+                    modelLabel: selectedEntry.label,
+                    providerLabel: selectedEntry.providerLabel,
+                    provider: selectedEntry.provider,
+                    model: selectedEntry.apiModelId,
+                    isLegacy: selectedEntry.isLegacy === true
+                }
+            ))
             setActivityState(null)
             setMessages(rollbackMessages)
             if (rollbackComposer !== null) {
@@ -621,6 +643,10 @@ function Chat({ currentChat }) {
     const threadWidth = 'w-full max-w-[min(100%,calc(100vw-1rem))] sm:max-w-[800px]'
     const composerWidth = 'w-full max-w-[min(100%,calc(100vw-1rem))] sm:max-w-[920px]'
     const modelSelectorLabel = `${selectedEntry.label} model settings`
+    const legacyModelNotice = chatInference?.isLegacy
+        ? `This chat uses ${chatInference.modelLabel} (${chatInference.providerLabel}), `
+            + 'which is no longer in the FrugalGPT model list. Messages still call the saved API model.'
+        : null
     const composerStatusClass = 'rounded-2xl border border-slate-200/90 bg-white p-6 text-center dark:border-white/[0.10] dark:bg-zinc-900'
 
     const renderComposerContent = () => {
@@ -791,6 +817,7 @@ function Chat({ currentChat }) {
                 draftWebSearch={sheetDraftWeb}
                 onDraftWebSearchChange={setSheetDraftWeb}
                 models={modelsAllowed}
+                entry={selectedEntry}
                 onApply={handleSheetApply}
                 readOnly={isExistingChat}
             />
@@ -843,7 +870,7 @@ function Chat({ currentChat }) {
 
                     {sendError && (
                         <div className="flex justify-center py-2">
-                            <p className="text-center text-sm text-red-600 dark:text-red-400">
+                            <p className="max-w-xl rounded-xl border border-red-200/80 bg-red-50 px-4 py-3 text-center text-sm leading-relaxed text-red-700 dark:border-red-500/30 dark:bg-red-950/40 dark:text-red-200">
                                 {sendError}
                             </p>
                         </div>
@@ -882,6 +909,11 @@ function Chat({ currentChat }) {
                 )}
 
                 <div className={clsx(composerWidth, 'space-y-2')}>
+                    {legacyModelNotice && (
+                        <p className="rounded-xl border border-amber-200/80 bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-900 dark:border-amber-500/30 dark:bg-amber-950/40 dark:text-amber-100">
+                            {legacyModelNotice}
+                        </p>
+                    )}
                     {renderComposerContent()}
                 </div>
             </div>

@@ -4,6 +4,8 @@ const {
     PROVIDERS,
     listRequiredModelsForProvider,
     isAllowedModel,
+    isPlausibleModelId,
+    resolveRequestModel,
     sanitizeModelId
 } = require('./loadModels')
 
@@ -13,5 +15,7 @@ module.exports = {
     PROVIDERS,
     listRequiredModelsForProvider,
     isAllowedModel,
+    isPlausibleModelId,
+    resolveRequestModel,
     sanitizeModelId
 }

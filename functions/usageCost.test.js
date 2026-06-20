@@ -141,6 +141,12 @@ test('computeTurnCost includes mistral agent tool fees', () => {
     assert.equal(costBreakdown.webSearchUsd, 0.02)
 })
 
+test('resolveRequestModel passes through plausible legacy model ids', () => {
+    const { resolveRequestModel } = require('./loadModels')
+    assert.equal(resolveRequestModel('openai', 'gpt-4o'), 'gpt-4o')
+    assert.equal(resolveRequestModel('openai', 'gpt-5.4'), 'gpt-5.4')
+})
+
 test('computeTurnCost estimates from text when usage is missing', () => {
     const messages = [{ role: 'user', content: 'Hello there' }]
     const assistantResponse = 'Hi!'

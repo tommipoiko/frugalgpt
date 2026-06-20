@@ -6,6 +6,8 @@ const {
     PROVIDERS,
     sanitizeModelId,
     isAllowedModel,
+    isPlausibleModelId,
+    resolveRequestModel,
     listRequiredModelsForProvider
 } = require('./modelCatalog')
 const openaiProvider = require('./providers/openaiProvider')
@@ -97,7 +99,7 @@ const resolveProviderCredentials = (userData, providerId, requestedModel) => {
     }
     return {
         apiKey: row.apiKey,
-        model: sanitizeModelId(providerId, requestedModel || row.model)
+        model: resolveRequestModel(providerId, requestedModel || row.model)
     }
 }
 
@@ -183,10 +185,8 @@ exports.generateChatResponseStreamHttp = onRequest(
             const bodyModel = typeof body.model === 'string' ? body.model.trim() : ''
             const adapter = providerAdapters[provider]
 
-            if (bodyModel && !isAllowedModel(provider, bodyModel)) {
-                res.status(400).json({
-                    error: `Unsupported model "${bodyModel}" for provider "${provider}".`
-                })
+            if (bodyModel && !isPlausibleModelId(bodyModel)) {
+                res.status(400).json({ error: 'Invalid model id.' })
                 return
             }
             if (!validateMessagesWithAttachments(messages, attachmentParts)) {
@@ -208,7 +208,9 @@ exports.generateChatResponseStreamHttp = onRequest(
                 return
             }
 
-            const modelCapabilities = inferCapabilities(provider, selectedModel)
+            const modelCapabilities = isAllowedModel(provider, selectedModel)
+                ? inferCapabilities(provider, selectedModel)
+                : { reasoning: true, webSearch: true }
             const effectiveReasoning = body.reasoningEnabled !== false && modelCapabilities.reasoning
             const effectiveWebSearch = body.webSearchEnabled !== false && modelCapabilities.webSearch
             const pipelineMessages = provider === 'openai'
