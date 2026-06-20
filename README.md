@@ -8,6 +8,8 @@ All provider API calls are executed on Firebase Cloud Functions, not in the brow
 
 - Google sign-in and passwordless email link sign-in with Firebase Auth
 - Chat history persisted per user in Firestore
+- Server-side answer generation via Firestore (continues if the tab closes or connection drops after the prompt is saved)
+- Live answer updates while you stay on the chat (~400ms Firestore refresh cadence)
 - Rename/delete/share chat threads from the sidebar
 - Markdown and code block rendering in assistant responses
 - Theme preferences (system, light, dark)
@@ -19,7 +21,9 @@ All provider API calls are executed on Firebase Cloud Functions, not in the brow
 3. Save one or more provider API keys.
 
 You do not need to provide an Assistant ID anymore. The app sends conversation history directly to provider chat APIs.
-The frontend calls the streaming HTTPS function `generateChatResponseStreamHttp`.
+
+When you send a prompt, the client writes the user message to Firestore and queues generation (`generationStatus: queued`).
+The Cloud Function `processChatGeneration` runs on the server, streams from the provider, and writes partial/final assistant text back to Firestore.
 Functions are deployed in `europe-north1` by default.
 
 ## Local development
@@ -35,7 +39,7 @@ The app expects Firebase config in `src/services/firebase.js`.
 ## Deploying functions
 
 ```bash
-firebase deploy --only functions,hosting
+firebase deploy --only functions,firestore:rules,hosting
 ```
 
 If you test from `localhost`, make sure functions are either deployed or run in the emulator.

@@ -1,34 +1,17 @@
 import {
-    addDoc, collection, doc, getDoc, serverTimestamp, setDoc, updateDoc
+    addDoc,
+    collection,
+    deleteField,
+    doc,
+    serverTimestamp,
+    setDoc,
+    updateDoc
 } from 'firebase/firestore'
 import { auth, db } from './firebase'
 import { buildAttachmentParts } from '../utils/attachmentParts'
 import { sumChatCostUsd } from '../utils/chatCost'
-import { computeTurnCost } from '../utils/usageCost'
+import { createNameForChat } from '../utils/chatTitle'
 
-const createNameForChat = async (titleSeed) => {
-    if (!titleSeed || typeof titleSeed !== 'string' || !titleSeed.trim()) return 'New chat'
-    const trimmed = titleSeed.trim().replace(/\s+/g, ' ')
-    if (trimmed.length <= 48) return trimmed
-    return `${trimmed.slice(0, 45)}…`
-}
-
-const toOpenAiMessages = (messages) => messages
-    .filter((message) => {
-        if (!message || !['user', 'system'].includes(message.role)) return false
-        const text = typeof message.content === 'string' ? message.content.trim() : ''
-        if (message.role === 'system') return text.length > 0
-        const hasAttachments = Array.isArray(message.attachments) && message.attachments.length > 0
-        return text.length > 0 || hasAttachments
-    })
-    .map((message) => ({
-        role: message.role,
-        content: typeof message.content === 'string' ? message.content : ''
-    }))
-
-const CHAT_RESPONSE_STREAM_HTTP_URL = process.env.REACT_APP_CHAT_RESPONSE_STREAM_HTTP_URL
-    || 'https://europe-north1-frugalgpt.cloudfunctions.net/'
-    + 'generateChatResponseStreamHttp'
 const LIST_AVAILABLE_MODELS_HTTP_URL = process.env.REACT_APP_LIST_AVAILABLE_MODELS_HTTP_URL
     || 'https://europe-north1-frugalgpt.cloudfunctions.net/'
     + 'listAvailableModelsHttp'
@@ -36,45 +19,24 @@ const CURATE_MODELS_HTTP_URL = process.env.REACT_APP_CURATE_MODELS_HTTP_URL
     || 'https://europe-north1-frugalgpt.cloudfunctions.net/'
     + 'curateModelsHttp'
 
-/** Firestore rejects `undefined` anywhere under `messages`. */
-const omitUndefinedKeys = (obj) => {
-    if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return obj
-    return Object.fromEntries(Object.entries(obj).filter(([, v]) => v !== undefined))
+const buildTitleSeed = (message) => {
+    const text = message.content?.trim()
+    if (text) return text
+    if (Array.isArray(message.attachments) && message.attachments.length) {
+        return message.attachments.map((a) => a.name).filter(Boolean).join(', ')
+    }
+    return ''
 }
 
-const parseStreamEventLines = (rawChunk) => rawChunk
-    .split('\n')
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line) => {
-        try {
-            return JSON.parse(line)
-        } catch (e) {
-            return null
-        }
-    })
-    .filter(Boolean)
-
-const sendMessage = async (
+const queueChatGeneration = async (
     message,
     existingMessages = [],
     chatId = null,
-    onAssistantDelta = null,
-    onReasoningDelta = null,
-    onSourcesUpdate = null,
-    onStatusUpdate = null,
     options = {}
 ) => {
     const user = auth.currentUser
     if (!user) {
         throw new Error('User not authenticated')
-    }
-
-    const docRef = doc(db, 'users', user.uid)
-    const docSnap = await getDoc(docRef)
-
-    if (!docSnap.exists()) {
-        throw new Error('User settings not found')
     }
 
     const {
@@ -94,180 +56,13 @@ const sendMessage = async (
     const persistReasoning = typeof docReasoning === 'boolean' ? docReasoning : reasoningEnabled
     const persistWeb = typeof docWeb === 'boolean' ? docWeb : webSearchEnabled
 
-    const conversation = toOpenAiMessages([...existingMessages, message])
     const attachmentParts = attachmentFiles.length
         ? await buildAttachmentParts(attachmentFiles)
         : []
-    const idToken = await user.getIdToken()
-    const response = await fetch(CHAT_RESPONSE_STREAM_HTTP_URL, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${idToken}`
-        },
-        body: JSON.stringify({
-            messages: conversation,
-            attachmentParts,
-            provider,
-            model: model || undefined,
-            reasoningEnabled,
-            webSearchEnabled
-        })
-    })
-
-    if (!response.ok) {
-        let errorMessage = 'Failed to generate response'
-        try {
-            const errorData = await response.json()
-            errorMessage = errorData.error || errorMessage
-        } catch (e) {
-            // Keep generic message if no JSON body is available.
-        }
-        throw new Error(errorMessage)
-    }
-
-    if (!response.body) {
-        throw new Error('Streaming response is not supported in this browser.')
-    }
-
-    const reader = response.body.getReader()
-    const decoder = new TextDecoder()
-    let chunkRemainder = ''
-    let assistantResponse = ''
-    let generatedTitle = null
-    let streamErrorMessage = ''
-    let turnUsage = null
-    let turnCostUsd = null
-    let turnCostSource = null
-    let turnCostBreakdown = null
-    const collectedSources = []
-    const seenSourceUrls = new Set()
-    const addSource = (source) => {
-        if (!source?.url || seenSourceUrls.has(source.url)) return
-        seenSourceUrls.add(source.url)
-        collectedSources.push(source)
-        if (onSourcesUpdate) {
-            onSourcesUpdate([...collectedSources])
-        }
-    }
-    const processStreamEvent = (event) => {
-        if (event.type === 'delta') {
-            assistantResponse += event.delta || ''
-            if (onAssistantDelta) {
-                onAssistantDelta(assistantResponse)
-            }
-            if (onReasoningDelta) {
-                onReasoningDelta('')
-            }
-        }
-
-        if (event.type === 'reasoning' && onReasoningDelta) {
-            onReasoningDelta(event.delta || '')
-        }
-
-        if (event.type === 'status' && onStatusUpdate) {
-            onStatusUpdate({
-                state: event.state || 'thinking',
-                message: event.message || ''
-            })
-        }
-
-        if (event.type === 'source' && event.source) {
-            addSource(event.source)
-        }
-
-        if (event.type === 'done') {
-            generatedTitle = event.title || null
-            assistantResponse = event.assistantResponse || assistantResponse
-            turnUsage = event.usage || null
-            turnCostUsd = typeof event.costUsd === 'number' ? event.costUsd : null
-            turnCostSource = typeof event.costSource === 'string' ? event.costSource : null
-            turnCostBreakdown = event.costBreakdown && typeof event.costBreakdown === 'object'
-                ? event.costBreakdown
-                : null
-            if (turnCostUsd === null && turnUsage) {
-                const costResult = computeTurnCost(
-                    event.provider || provider,
-                    event.model || model || modelKey,
-                    turnUsage,
-                    conversation,
-                    assistantResponse
-                )
-                turnCostUsd = typeof costResult.costUsd === 'number' ? costResult.costUsd : null
-                turnCostSource = turnCostSource || costResult.costSource
-                turnCostBreakdown = turnCostBreakdown || costResult.costBreakdown
-            }
-            if (Array.isArray(event.sources)) {
-                event.sources.forEach(addSource)
-            }
-            if (onAssistantDelta) {
-                onAssistantDelta(assistantResponse)
-            }
-            if (onReasoningDelta) {
-                onReasoningDelta('')
-            }
-            if (onStatusUpdate) {
-                onStatusUpdate({ state: 'done', message: '' })
-            }
-        }
-        if (event.type === 'error') {
-            streamErrorMessage = event.error || 'Failed generating response.'
-            if (onStatusUpdate) {
-                onStatusUpdate({ state: 'error', message: streamErrorMessage })
-            }
-        }
-    }
-
-    // eslint-disable-next-line no-constant-condition
-    while (true) {
-        // Streaming requires sequential reads from the same reader.
-        // eslint-disable-next-line no-await-in-loop
-        const { done, value } = await reader.read()
-        if (done) break
-
-        chunkRemainder += decoder.decode(value, { stream: true })
-        const lines = chunkRemainder.split('\n')
-        chunkRemainder = lines.pop() || ''
-
-        const parsedEvents = parseStreamEventLines(lines.join('\n'))
-        parsedEvents.forEach(processStreamEvent)
-    }
-
-    const finalEvents = parseStreamEventLines(chunkRemainder)
-    finalEvents.forEach(processStreamEvent)
-
-    if (streamErrorMessage) {
-        throw new Error(streamErrorMessage)
-    }
-
-    if (!assistantResponse) {
-        throw new Error('No response received from the model.')
-    }
-
-    const assistantMessage = {
-        id: Date.now() + 1,
-        role: 'system',
-        content: assistantResponse,
-        sources: collectedSources,
-        ...(turnUsage ? { usage: turnUsage } : {}),
-        ...(typeof turnCostUsd === 'number' ? { costUsd: turnCostUsd } : {}),
-        ...(turnCostSource ? { costSource: turnCostSource } : {}),
-        ...(turnCostBreakdown ? { costBreakdown: omitUndefinedKeys(turnCostBreakdown) } : {}),
-        ...(typeof modelKey === 'string' && modelKey.trim()
-            ? { modelKey: modelKey.trim() }
-            : {}),
-        provider,
-        ...(model ? { model } : {}),
-        costRecordedAt: new Date().toISOString()
-    }
-    const finalMessages = [...existingMessages, message, assistantMessage].map((m) => {
-        const cleaned = omitUndefinedKeys(m)
-        if (Array.isArray(cleaned.sources)) {
-            cleaned.sources = cleaned.sources.map((s) => omitUndefinedKeys(s))
-        }
-        return cleaned
-    })
-    const totalCostUsd = sumChatCostUsd(finalMessages)
+    const requestId = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+    const messages = [...existingMessages, message]
+    const titleSeed = buildTitleSeed(message)
+    const fallbackTitle = createNameForChat(titleSeed)
 
     const inferenceFields = {
         provider,
@@ -285,32 +80,41 @@ const sendMessage = async (
         webSearchEnabled: persistWeb
     }
 
+    const generationFields = {
+        generationStatus: 'queued',
+        generationActivity: 'thinking',
+        generationError: null,
+        pendingGeneration: {
+            requestId,
+            attachmentParts,
+            reasoningEnabled,
+            webSearchEnabled
+        }
+    }
+
     if (!chatId) {
-        const titleSeed = message.content?.trim()
-            || (Array.isArray(message.attachments) && message.attachments.length
-                ? message.attachments.map((a) => a.name).filter(Boolean).join(', ')
-                : '')
-        const fallbackTitle = await createNameForChat(titleSeed)
         const createdChat = await addDoc(collection(db, 'chats'), {
-            name: generatedTitle || fallbackTitle,
+            name: fallbackTitle,
             userId: user.uid,
-            messages: finalMessages,
-            totalCostUsd,
+            messages,
+            totalCostUsd: sumChatCostUsd(messages),
             lastUpdated: serverTimestamp(),
-            ...inferenceFields
+            ...inferenceFields,
+            ...generationFields
         })
-        return { chatId: createdChat.id, finalMessages }
+        return { chatId: createdChat.id }
     }
 
     await updateDoc(doc(db, 'chats', chatId), {
-        messages: finalMessages,
-        totalCostUsd,
+        messages,
+        totalCostUsd: sumChatCostUsd(messages),
         lastUpdated: serverTimestamp(),
         userId: user.uid,
-        ...inferenceFields
+        ...inferenceFields,
+        ...generationFields
     })
 
-    return { chatId, finalMessages }
+    return { chatId }
 }
 
 const fetchAvailableModels = async (provider = 'openai') => {
@@ -370,6 +174,14 @@ const updateChatInferenceDoc = async (chatId, inferenceFields) => {
     })
 }
 
+const clearChatGenerationError = async (chatId) => {
+    const user = auth.currentUser
+    if (!user || !chatId) return
+    await updateDoc(doc(db, 'chats', chatId), {
+        generationError: deleteField()
+    })
+}
+
 const saveUserChatDefaults = async (defaults) => {
     const user = auth.currentUser
     if (!user) throw new Error('User not authenticated')
@@ -407,9 +219,10 @@ const runModelCuration = async () => {
 }
 
 export default {
-    sendMessage,
+    queueChatGeneration,
     fetchAvailableModels,
     updateChatInferenceDoc,
+    clearChatGenerationError,
     saveUserChatDefaults,
     runModelCuration
 }

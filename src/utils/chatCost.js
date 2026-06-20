@@ -20,10 +20,22 @@ export function sumChatCostUsd(messages, chatContext = {}) {
     }, 0)
 }
 
+/** Slight overestimate on aggregate spend so totals stay closer to real billing. */
+export const SPENDING_DISPLAY_CUSHION = 1.01
+
 export function formatChatCostUsd(usd) {
     if (typeof usd !== 'number' || !Number.isFinite(usd)) return '0.00'
     if (usd > 0 && usd < 0.01) return '<0.01'
     return usd.toFixed(2)
+}
+
+export function applySpendingDisplayCushion(usd) {
+    if (typeof usd !== 'number' || !Number.isFinite(usd) || usd <= 0) return 0
+    return usd * SPENDING_DISPLAY_CUSHION
+}
+
+export function formatDisplayedSpendingUsd(usd) {
+    return formatChatCostUsd(applySpendingDisplayCushion(usd))
 }
 
 export function summarizeChatCost(messages, chatContext = {}) {

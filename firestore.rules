@@ -7,7 +7,18 @@ service cloud.firestore {
     }
 
     match /chats/{threadId} {
-      allow read, write: if request.auth != null;
+      allow read: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow create: if request.auth != null
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.generationStatus == 'queued';
+      allow update: if request.auth != null
+        && resource.data.userId == request.auth.uid
+        && (
+          request.resource.data.generationStatus == 'queued'
+          || !request.resource.data.diff(resource.data).affectedKeys()
+            .hasAny(['generationStatus', 'generationActivity', 'pendingGeneration'])
+        );
+      allow delete: if request.auth != null && resource.data.userId == request.auth.uid;
     }
   }
 }

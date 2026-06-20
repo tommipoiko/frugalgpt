@@ -10,7 +10,7 @@ import {
 } from 'firebase/firestore'
 import { auth, db } from '../services/firebase'
 import { fetchSpendingLast30Days } from '../services/spendingApi'
-import { formatChatCostUsd } from '../utils/chatCost'
+import { formatDisplayedSpendingUsd } from '../utils/chatCost'
 import ProviderLogo from './Brand/ProviderLogo'
 import useKeyboardOverlapBottom from '../hooks/useKeyboardOverlapBottom'
 
@@ -292,7 +292,7 @@ function User({ setMode }) {
                                 </p>
                                 <p className="mt-1 text-2xl font-semibold tabular-nums text-slate-900 dark:text-white">
                                     $
-                                    {formatChatCostUsd(spending?.totalUsd || 0)}
+                                    {formatDisplayedSpendingUsd(spending?.totalUsd || 0)}
                                 </p>
                                 {spending && (spending.estimatedTurns > 0) && (
                                     <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">
@@ -321,7 +321,7 @@ function User({ setMode }) {
                                             </div>
                                             <span className="shrink-0 text-sm tabular-nums text-slate-600 dark:text-zinc-300">
                                                 $
-                                                {formatChatCostUsd(amount)}
+                                                {formatDisplayedSpendingUsd(amount)}
                                             </span>
                                         </li>
                                     )
@@ -338,8 +338,9 @@ function User({ setMode }) {
 
                             <p className="mt-4 text-xs leading-relaxed text-slate-500 dark:text-zinc-500">
                                 Based on stored message usage (tokens, cache, web search, and
-                                documented surcharges). Only turns with a recorded cost in the
-                                last 30 days are included.
+                                documented surcharges). Totals include a 1% allowance for
+                                untracked costs such as chat titles. Only turns with a recorded
+                                cost in the last 30 days are included.
                             </p>
                         </>
                     )}

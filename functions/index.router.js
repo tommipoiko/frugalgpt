@@ -1,5 +1,7 @@
 const { onRequest } = require('firebase-functions/v2/https')
+const { onDocumentWritten } = require('firebase-functions/v2/firestore')
 const admin = require('firebase-admin')
+const { runChatGeneration } = require('./chatGeneration')
 const { inferCapabilities } = require('./providerConfig')
 const {
     DEFAULT_MODEL_BY_PROVIDER,
@@ -333,6 +335,22 @@ exports.listAvailableModelsHttp = onRequest(
             const message = error?.error?.message || error?.message || 'Failed fetching available models.'
             res.status(500).json({ error: message })
         }
+    }
+)
+
+exports.processChatGeneration = onDocumentWritten(
+    {
+        document: 'chats/{chatId}',
+        region: FUNCTION_REGION,
+        timeoutSeconds: 300
+    },
+    async (event) => {
+        const after = event.data?.after?.data()
+        if (!after || after.generationStatus !== 'queued') {
+            return
+        }
+        const chatId = event.params.chatId
+        await runChatGeneration(chatId)
     }
 )
 

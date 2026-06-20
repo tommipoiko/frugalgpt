@@ -65,9 +65,10 @@ function Chat({ currentChat }) {
     const [canSendMessages, setCanSendMessages] = useState(false)
     const [currentUser, setCurrentUser] = useState(null)
     const [userSettingsLoaded, setUserSettingsLoaded] = useState(false)
-    const [isSendingMessage, setIsSendingMessage] = useState(false)
+    const [isQueueingMessage, setIsQueueingMessage] = useState(false)
     const [sendError, setSendError] = useState('')
-    const [activityState, setActivityState] = useState(null)
+    const [generationStatus, setGenerationStatus] = useState('idle')
+    const [generationActivity, setGenerationActivity] = useState(null)
     const [chatName, setChatName] = useState('')
     const [userSettings, setUserSettings] = useState(null)
     const [chatInference, setChatInference] = useState(null)
@@ -122,6 +123,28 @@ function Chat({ currentChat }) {
         [selectedModelKey, chatInference]
     )
     const { provider } = selectedEntry
+
+    const isGenerating = generationStatus === 'queued' || generationStatus === 'running'
+    const isBusySending = isQueueingMessage || isGenerating
+
+    const lastMessage = messages[messages.length - 1]
+    const hasStreamingAssistantText = lastMessage?.role === 'system'
+        && typeof lastMessage.content === 'string'
+        && lastMessage.content.trim().length > 0
+    const activityState = isGenerating && generationActivity && !hasStreamingAssistantText
+        ? generationActivity
+        : null
+
+    const prevGenerationStatus = useRef('idle')
+
+    const displayMessages = useMemo(() => {
+        if (!messages.length) return messages
+        const last = messages[messages.length - 1]
+        if (last?.role === 'system' && !String(last.content || '').trim()) {
+            return messages.slice(0, -1)
+        }
+        return messages
+    }, [messages])
 
     const sheetDraftEntry = useMemo(
         () => (isExistingChat && chatInference?.entry
@@ -217,6 +240,21 @@ function Chat({ currentChat }) {
                         const data = snapshot.data()
                         setMessages(data.messages || [])
                         setChatName(data.name || '')
+                        setGenerationStatus(data.generationStatus || 'idle')
+                        setGenerationActivity(data.generationActivity || null)
+                        if (typeof data.generationError === 'string' && data.generationError.trim()) {
+                            setSendError(formatChatModelError(
+                                data.generationError,
+                                chatInferenceRef.current || {
+                                    modelLabel: data.modelLabel,
+                                    providerLabel: data.providerLabel,
+                                    provider: data.provider,
+                                    model: data.model,
+                                    isLegacy: false
+                                }
+                            ))
+                            chatApi.clearChatGenerationError(id).catch(() => {})
+                        }
                         const inference = resolveChatInferenceFromFirestore(data)
                         if (inference) {
                             setChatInference(inference)
@@ -244,6 +282,8 @@ function Chat({ currentChat }) {
                 setMessages([])
                 setChatName('')
                 setChatInference(null)
+                setGenerationStatus('idle')
+                setGenerationActivity(null)
             }
         })
         return () => {
@@ -312,10 +352,19 @@ function Chat({ currentChat }) {
     }, [modelSheetOpen, currentUser?.uid])
 
     useEffect(() => {
+        if (prevGenerationStatus.current === 'running' && generationStatus === 'idle' && currentUser?.uid) {
+            fetchDailyUsageLast30Days(currentUser.uid)
+                .then((summary) => setAverageDailyUsage(summary.averageDaily))
+                .catch(() => {})
+        }
+        prevGenerationStatus.current = generationStatus
+    }, [generationStatus, currentUser?.uid])
+
+    useEffect(() => {
         if (autoScrollEnabled && listRef.current) {
             listRef.current.scrollTop = listRef.current.scrollHeight
         }
-    }, [messages, autoScrollEnabled])
+    }, [messages, autoScrollEnabled, generationActivity, generationStatus])
 
     const syncComposerHeight = () => {
         const el = composerRef.current
@@ -439,59 +488,13 @@ function Chat({ currentChat }) {
         const persistW = persistWebForDoc(selectedEntry, webSearchEnabled)
 
         setSendError('')
-        setActivityState('thinking')
-        setIsSendingMessage(true)
-
-        const streamingAssistantMessageId = Date.now() + 1
-        setMessages([
-            ...priorMessages,
-            userMessage,
-            {
-                id: streamingAssistantMessageId,
-                content: '',
-                role: 'system',
-                sources: []
-            }
-        ])
+        setIsQueueingMessage(true)
 
         try {
-            const { chatId, finalMessages } = await chatApi.sendMessage(
+            const { chatId } = await chatApi.queueChatGeneration(
                 userMessage,
                 priorMessages,
                 id || currentChat,
-                (partialAssistantText) => {
-                    if (partialAssistantText.trim()) {
-                        setActivityState(null)
-                    }
-                    setMessages((prev) => prev.map((msg) => {
-                        if (msg.id === streamingAssistantMessageId) {
-                            return { ...msg, content: partialAssistantText }
-                        }
-                        return msg
-                    }))
-                },
-                () => {},
-                (sources) => {
-                    setMessages((prev) => prev.map((msg) => {
-                        if (msg.id === streamingAssistantMessageId) {
-                            return { ...msg, sources }
-                        }
-                        return msg
-                    }))
-                },
-                (status) => {
-                    if (status.state === 'responding' || status.state === 'done') {
-                        setActivityState(null)
-                        return
-                    }
-                    if (status.state === 'searching') {
-                        setActivityState('searching')
-                    } else if (status.state === 'reasoning') {
-                        setActivityState('reasoning')
-                    } else if (status.state === 'thinking') {
-                        setActivityState('thinking')
-                    }
-                },
                 {
                     provider: selectedEntry.provider,
                     model: selectedEntry.apiModelId,
@@ -512,13 +515,6 @@ function Chat({ currentChat }) {
                     if (a.previewUrl) URL.revokeObjectURL(a.previewUrl)
                 })
             }
-            setMessages(finalMessages)
-            setActivityState(null)
-            if (currentUser?.uid) {
-                fetchDailyUsageLast30Days(currentUser.uid)
-                    .then((summary) => setAverageDailyUsage(summary.averageDaily))
-                    .catch(() => {})
-            }
             if (!id && chatId) {
                 navigate(`/chats/${chatId}`, { replace: true })
             }
@@ -533,7 +529,6 @@ function Chat({ currentChat }) {
                     isLegacy: selectedEntry.isLegacy === true
                 }
             ))
-            setActivityState(null)
             setMessages(rollbackMessages)
             if (rollbackComposer !== null) {
                 setCurrentMessage(rollbackComposer)
@@ -542,7 +537,7 @@ function Chat({ currentChat }) {
                 setAttachments(rollbackAttachments)
             }
         } finally {
-            setIsSendingMessage(false)
+            setIsQueueingMessage(false)
         }
     }
 
@@ -559,7 +554,7 @@ function Chat({ currentChat }) {
 
     const handleRetryPrompt = (messageId) => {
         const messageIndex = messages.findIndex((msg) => msg.id === messageId)
-        if (messageIndex === -1 || isSendingMessage || !canSendMessages) return
+        if (messageIndex === -1 || isBusySending || !canSendMessages) return
 
         const userMessage = messages[messageIndex]
         if (userMessage.role !== 'user') return
@@ -579,7 +574,7 @@ function Chat({ currentChat }) {
 
     const handleEditPrompt = (messageId) => {
         const messageIndex = messages.findIndex((msg) => msg.id === messageId)
-        if (messageIndex === -1 || isSendingMessage) return
+        if (messageIndex === -1 || isBusySending) return
 
         const userMessage = messages[messageIndex]
         if (userMessage.role !== 'user') return
@@ -600,7 +595,7 @@ function Chat({ currentChat }) {
 
     const handleEditPromptSubmit = async (event) => {
         event.preventDefault()
-        if (!editPromptState || isSendingMessage || !canSendMessages) return
+        if (!editPromptState || isBusySending || !canSendMessages) return
 
         const trimmed = editPromptState.draft.trim()
         if (!trimmed) return
@@ -627,7 +622,7 @@ function Chat({ currentChat }) {
     const handleSendMessage = async () => {
         const trimmed = currentMessage.trim()
         const fileSlots = attachments.map((a) => a.file)
-        if ((!trimmed && fileSlots.length === 0) || !canSendMessages || isSendingMessage) return
+        if ((!trimmed && fileSlots.length === 0) || !canSendMessages || isBusySending) return
         if (!hasProviderKey(userSettings, selectedEntry.provider)) return
 
         const preparedAttachments = [...attachments]
@@ -693,7 +688,7 @@ function Chat({ currentChat }) {
         () => buildChatCostTooltip(chatCost),
         [chatCost]
     )
-    const isEmpty = messages.length === 0 && !isSendingMessage
+    const isEmpty = displayMessages.length === 0 && !isBusySending
     const showJumpLatest = !autoScrollEnabled && !isEmpty
     const threadWidth = 'w-full max-w-[min(100%,calc(100vw-1rem))] sm:max-w-[800px]'
     const composerWidth = 'w-full max-w-[min(100%,calc(100vw-1rem))] sm:max-w-[920px]'
@@ -824,7 +819,7 @@ function Chat({ currentChat }) {
                                     onChange={handleAttachFile}
                                     disabled={
                                         !canSendMessages
-                                                    || isSendingMessage
+                                                    || isBusySending
                                                     || attachments.length >= MAX_ATTACHMENT_SLOTS
                                     }
                                 />
@@ -856,14 +851,14 @@ function Chat({ currentChat }) {
                             type="submit"
                             disabled={
                                 !canSendMessages
-                                            || isSendingMessage
+                                            || isBusySending
                                             || (currentMessage.trim() === ''
                                                 && attachments.length === 0)
                             }
                             className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-brand-600 to-brand-400 text-white shadow-md shadow-brand-500/25 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:bg-none disabled:text-slate-400 disabled:shadow-none dark:disabled:bg-zinc-800 dark:disabled:text-zinc-600"
-                            title={isSendingMessage ? 'Generating…' : 'Send'}
+                            title={isBusySending ? 'Generating…' : 'Send'}
                         >
-                            {isSendingMessage
+                            {isBusySending
                                 ? <Square className="h-4 w-4 fill-current" />
                                 : <ArrowUp className="h-4 w-4" />}
                         </button>
@@ -902,7 +897,7 @@ function Chat({ currentChat }) {
                         <EmptyState />
                     )}
 
-                    {!isEmpty && messages.map((message) => (
+                    {!isEmpty && displayMessages.map((message) => (
                         <div
                             key={message.id}
                             className={clsx(
@@ -927,7 +922,7 @@ function Chat({ currentChat }) {
                                         ? () => handleEditPrompt(message.id)
                                         : undefined
                                 }
-                                actionsDisabled={isSendingMessage}
+                                actionsDisabled={isBusySending}
                             />
                         </div>
                     ))}
@@ -1020,7 +1015,7 @@ function Chat({ currentChat }) {
                             </button>
                             <button
                                 type="submit"
-                                disabled={!editPromptState.draft.trim() || isSendingMessage}
+                                disabled={!editPromptState.draft.trim() || isBusySending}
                                 className="rounded-[10px] bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
                             >
                                 Save & resend
