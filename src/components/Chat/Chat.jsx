@@ -58,6 +58,7 @@ function Chat({ currentChat }) {
     const [currentMessage, setCurrentMessage] = useState('')
     const [attachments, setAttachments] = useState([])
     const [canSendMessages, setCanSendMessages] = useState(false)
+    const [userSettingsLoaded, setUserSettingsLoaded] = useState(false)
     const [isSendingMessage, setIsSendingMessage] = useState(false)
     const [sendError, setSendError] = useState('')
     const [activityState, setActivityState] = useState(null)
@@ -82,6 +83,7 @@ function Chat({ currentChat }) {
     const [sheetDraftModelKey, setSheetDraftModelKey] = useState('gpt-5.4')
     const [sheetDraftReasoning, setSheetDraftReasoning] = useState(true)
     const [sheetDraftWeb, setSheetDraftWeb] = useState(true)
+    const [editPromptState, setEditPromptState] = useState(null)
 
     const { id } = useParams()
     const navigate = useNavigate()
@@ -89,6 +91,7 @@ function Chat({ currentChat }) {
     const composerRef = useRef(null)
     const attachmentsRef = useRef([])
     const fileInputRef = useRef(null)
+    const editPromptRef = useRef(null)
     const prevSheetOpen = useRef(false)
     const [autoScrollEnabled, setAutoScrollEnabled] = useState(true)
     const keyboardInset = useKeyboardOverlapBottom()
@@ -147,18 +150,30 @@ function Chat({ currentChat }) {
             if (!user) {
                 setCanSendMessages(false)
                 setUserSettings(null)
+                setUserSettingsLoaded(true)
                 setMessages([])
                 setChatName('')
                 return
             }
-            unsubUser = onSnapshot(doc(db, 'users', user.uid), (snap) => {
-                const data = snap.exists() ? snap.data() : null
-                setUserSettings(data)
-                setCanSendMessages(hasProviderKey(data, 'openai')
-                    || hasProviderKey(data, 'anthropic')
-                    || hasProviderKey(data, 'google')
-                    || hasProviderKey(data, 'mistral'))
-            })
+            setUserSettingsLoaded(false)
+            unsubUser = onSnapshot(
+                doc(db, 'users', user.uid),
+                (snap) => {
+                    const data = snap.exists() ? snap.data() : null
+                    setUserSettings(data)
+                    setCanSendMessages(hasProviderKey(data, 'openai')
+                        || hasProviderKey(data, 'anthropic')
+                        || hasProviderKey(data, 'google')
+                        || hasProviderKey(data, 'mistral'))
+                    setUserSettingsLoaded(true)
+                },
+                (error) => {
+                    console.error('Failed to load user settings:', error)
+                    setUserSettings(null)
+                    setCanSendMessages(false)
+                    setUserSettingsLoaded(true)
+                }
+            )
             if (id) {
                 unsubChat = onSnapshot(doc(db, 'chats', id), (snapshot) => {
                     if (snapshot.exists()) {
@@ -254,6 +269,11 @@ function Chat({ currentChat }) {
         syncComposerHeight()
     }, [currentMessage])
 
+    useEffect(() => {
+        if (!editPromptState) return
+        requestAnimationFrame(() => editPromptRef.current?.focus())
+    }, [editPromptState])
+
     const effectiveReasoningRequest = apiReasoningForRequest(selectedEntry, reasoningEnabled)
     const effectiveWebRequest = apiWebForRequest(selectedEntry, webSearchEnabled)
 
@@ -345,43 +365,25 @@ function Chat({ currentChat }) {
         })
     }
 
-    const handleSendMessage = async () => {
-        const trimmed = currentMessage.trim()
-        const fileSlots = attachments.map((a) => a.file)
-        if ((!trimmed && fileSlots.length === 0) || !canSendMessages || isSendingMessage) return
-        if (!hasProviderKey(userSettings, selectedEntry.provider)) return
-
+    const runMessageGeneration = async ({
+        userMessage,
+        priorMessages,
+        attachmentFiles = [],
+        rollbackMessages,
+        rollbackComposer = null,
+        rollbackAttachments = null
+    }) => {
         const persistR = persistReasoningForDoc(selectedEntry, reasoningEnabled)
         const persistW = persistWebForDoc(selectedEntry, webSearchEnabled)
 
         setSendError('')
         setActivityState('thinking')
         setIsSendingMessage(true)
-        const preparedAttachments = [...attachments]
-        const outgoingMessage = currentMessage
-        const storedAttachments = summarizeAttachmentsForStore(fileSlots)
-        const newMessage = {
-            id: Date.now(),
-            content: trimmed,
-            role: 'user',
-            ...(storedAttachments.length ? { attachments: storedAttachments } : {})
-        }
 
-        const updatedMessages = [...messages, newMessage]
-        setMessages(updatedMessages)
-        setCurrentMessage('')
-        setAttachments([])
-        if (isMobileLayout) {
-            composerRef.current?.blur()
-            if (typeof document !== 'undefined' && document.activeElement instanceof HTMLElement) {
-                document.activeElement.blur()
-            }
-        } else {
-            requestAnimationFrame(() => composerRef.current?.focus())
-        }
         const streamingAssistantMessageId = Date.now() + 1
         setMessages([
-            ...updatedMessages,
+            ...priorMessages,
+            userMessage,
             {
                 id: streamingAssistantMessageId,
                 content: '',
@@ -392,8 +394,8 @@ function Chat({ currentChat }) {
 
         try {
             const { chatId, finalMessages } = await chatApi.sendMessage(
-                newMessage,
-                messages,
+                userMessage,
+                priorMessages,
                 id || currentChat,
                 (partialAssistantText) => {
                     if (partialAssistantText.trim()) {
@@ -438,12 +440,14 @@ function Chat({ currentChat }) {
                         reasoningEnabled: persistR,
                         webSearchEnabled: persistW
                     },
-                    attachmentFiles: fileSlots
+                    attachmentFiles
                 }
             )
-            preparedAttachments.forEach((a) => {
-                if (a.previewUrl) URL.revokeObjectURL(a.previewUrl)
-            })
+            if (rollbackAttachments) {
+                rollbackAttachments.forEach((a) => {
+                    if (a.previewUrl) URL.revokeObjectURL(a.previewUrl)
+                })
+            }
             setMessages(finalMessages)
             setActivityState(null)
             if (!id && chatId) {
@@ -452,12 +456,131 @@ function Chat({ currentChat }) {
         } catch (error) {
             setSendError(error.message || 'Failed to send message. Please try again.')
             setActivityState(null)
-            setMessages(messages)
-            setCurrentMessage(outgoingMessage)
-            setAttachments(preparedAttachments)
+            setMessages(rollbackMessages)
+            if (rollbackComposer !== null) {
+                setCurrentMessage(rollbackComposer)
+            }
+            if (rollbackAttachments !== null) {
+                setAttachments(rollbackAttachments)
+            }
         } finally {
             setIsSendingMessage(false)
         }
+    }
+
+    const handleCopyPrompt = async (messageId) => {
+        const target = messages.find((msg) => msg.id === messageId)
+        const text = target?.content?.trim()
+        if (!text) return
+        try {
+            await navigator.clipboard.writeText(text)
+        } catch {
+            setSendError('Could not copy to clipboard.')
+        }
+    }
+
+    const handleRetryPrompt = (messageId) => {
+        const messageIndex = messages.findIndex((msg) => msg.id === messageId)
+        if (messageIndex === -1 || isSendingMessage || !canSendMessages) return
+
+        const userMessage = messages[messageIndex]
+        if (userMessage.role !== 'user') return
+        if (!hasProviderKey(userSettings, selectedEntry.provider)) return
+        if (Array.isArray(userMessage.attachments) && userMessage.attachments.length > 0) {
+            setSendError('Retry is not supported for messages with attachments.')
+            return
+        }
+
+        const priorMessages = messages.slice(0, messageIndex)
+        runMessageGeneration({
+            userMessage,
+            priorMessages,
+            rollbackMessages: messages
+        })
+    }
+
+    const handleEditPrompt = (messageId) => {
+        const messageIndex = messages.findIndex((msg) => msg.id === messageId)
+        if (messageIndex === -1 || isSendingMessage) return
+
+        const userMessage = messages[messageIndex]
+        if (userMessage.role !== 'user') return
+        if (Array.isArray(userMessage.attachments) && userMessage.attachments.length > 0) {
+            setSendError('Edit is not supported for messages with attachments.')
+            return
+        }
+
+        setEditPromptState({
+            messageId,
+            draft: userMessage.content || ''
+        })
+    }
+
+    const handleEditPromptCancel = () => {
+        setEditPromptState(null)
+    }
+
+    const handleEditPromptSubmit = async (event) => {
+        event.preventDefault()
+        if (!editPromptState || isSendingMessage || !canSendMessages) return
+
+        const trimmed = editPromptState.draft.trim()
+        if (!trimmed) return
+        if (!hasProviderKey(userSettings, selectedEntry.provider)) return
+
+        const messageIndex = messages.findIndex((msg) => msg.id === editPromptState.messageId)
+        if (messageIndex === -1) {
+            setEditPromptState(null)
+            return
+        }
+
+        const original = messages[messageIndex]
+        const priorMessages = messages.slice(0, messageIndex)
+        const editedMessage = { ...original, content: trimmed }
+
+        setEditPromptState(null)
+        await runMessageGeneration({
+            userMessage: editedMessage,
+            priorMessages,
+            rollbackMessages: messages
+        })
+    }
+
+    const handleSendMessage = async () => {
+        const trimmed = currentMessage.trim()
+        const fileSlots = attachments.map((a) => a.file)
+        if ((!trimmed && fileSlots.length === 0) || !canSendMessages || isSendingMessage) return
+        if (!hasProviderKey(userSettings, selectedEntry.provider)) return
+
+        const preparedAttachments = [...attachments]
+        const outgoingMessage = currentMessage
+        const storedAttachments = summarizeAttachmentsForStore(fileSlots)
+        const newMessage = {
+            id: Date.now(),
+            content: trimmed,
+            role: 'user',
+            ...(storedAttachments.length ? { attachments: storedAttachments } : {})
+        }
+
+        setCurrentMessage('')
+        setAttachments([])
+        if (isMobileLayout) {
+            composerRef.current?.blur()
+            if (typeof document !== 'undefined' && document.activeElement instanceof HTMLElement) {
+                document.activeElement.blur()
+            }
+        } else {
+            requestAnimationFrame(() => composerRef.current?.focus())
+        }
+
+        await runMessageGeneration({
+            userMessage: newMessage,
+            priorMessages: messages,
+            attachmentFiles: fileSlots,
+            rollbackMessages: messages,
+            rollbackComposer: outgoingMessage,
+            rollbackAttachments: preparedAttachments
+        })
     }
 
     const handleAttachFile = () => {
@@ -492,6 +615,150 @@ function Chat({ currentChat }) {
     const threadWidth = 'w-full max-w-[min(100%,calc(100vw-1rem))] sm:max-w-[800px]'
     const composerWidth = 'w-full max-w-[min(100%,calc(100vw-1rem))] sm:max-w-[920px]'
     const modelSelectorLabel = `${selectedEntry.label} model settings`
+    const composerStatusClass = 'rounded-2xl border border-slate-200/90 bg-white p-6 text-center dark:border-white/[0.10] dark:bg-zinc-900'
+
+    const renderComposerContent = () => {
+        if (!userSettingsLoaded) {
+            return (
+                <div className={composerStatusClass}>
+                    <p className="text-sm text-slate-600 dark:text-zinc-400">
+                        Loading your settings…
+                    </p>
+                </div>
+            )
+        }
+
+        if (!canSendMessages) {
+            return (
+                <div className={composerStatusClass}>
+                    <p className="text-sm text-slate-600 dark:text-zinc-400">
+                        You cannot send messages because no provider API key is saved.
+                        {' '}
+                        <button
+                            type="button"
+                            className="font-semibold text-brand-600 hover:underline dark:text-brand-400"
+                            onClick={() => navigate('/user')}
+                        >
+                            Add keys in settings.
+                        </button>
+                    </p>
+                </div>
+            )
+        }
+
+        return (
+            <>
+                {attachments.length > 0 && (
+                    <div className="flex flex-wrap gap-2 pb-1">
+                        {attachments.map((a) => (
+                            <div
+                                key={a.id}
+                                className="group relative h-14 w-14 shrink-0 overflow-hidden rounded-xl border border-slate-200/90 bg-slate-100 dark:border-white/[0.12] dark:bg-zinc-800/80"
+                            >
+                                {a.previewUrl ? (
+                                    <img
+                                        src={a.previewUrl}
+                                        alt=""
+                                        className="h-full w-full object-cover"
+                                    />
+                                ) : (
+                                    <div className="flex h-full w-full flex-col items-center justify-center gap-0.5 px-1">
+                                        <Paperclip className="h-4 w-4 shrink-0 text-slate-500 dark:text-zinc-400" aria-hidden />
+                                        <span className="max-w-full truncate text-[9px] font-medium leading-tight text-slate-600 dark:text-zinc-300">
+                                            {(a.file.name.split('.').pop() || 'file').slice(0, 6)}
+                                        </span>
+                                    </div>
+                                )}
+                                {isMobileLayout && (
+                                    <button
+                                        type="button"
+                                        className="absolute inset-0 z-[1] rounded-xl bg-transparent active:bg-black/10"
+                                        aria-label={`Remove ${a.file.name}`}
+                                        onClick={() => removeAttachment(a.id)}
+                                    />
+                                )}
+                                <button
+                                    type="button"
+                                    className="absolute right-0.5 top-0.5 z-[2] flex h-6 w-6 items-center justify-center rounded-md bg-black/55 text-white opacity-0 shadow-md transition-opacity hover:bg-black/70 focus-visible:opacity-100 group-hover:opacity-100 max-[600px]:hidden"
+                                    aria-label={`Remove ${a.file.name}`}
+                                    onClick={() => removeAttachment(a.id)}
+                                >
+                                    <X className="h-3.5 w-3.5" strokeWidth={2.5} aria-hidden />
+                                </button>
+                            </div>
+                        ))}
+                    </div>
+                )}
+
+                <form
+                    className="flex flex-col gap-2 rounded-[24px] border border-slate-200/90 bg-white p-2 shadow-lg shadow-slate-900/5 transition focus-within:border-brand-500 focus-within:ring-2 focus-within:ring-brand-500/20 min-[600px]:flex-row min-[600px]:items-end min-[600px]:gap-2 dark:border-white/[0.10] dark:bg-zinc-900 dark:shadow-black/40"
+                    onSubmit={(e) => {
+                        e.preventDefault()
+                        handleSendMessage()
+                    }}
+                >
+                    <textarea
+                        ref={composerRef}
+                        rows={1}
+                        placeholder="Ask anything..."
+                        value={currentMessage}
+                        onChange={(e) => setCurrentMessage(e.target.value)}
+                        onKeyDown={handleKeyDown}
+                        disabled={!canSendMessages}
+                        className="scrollbar-none order-1 max-h-[240px] min-h-[44px] w-full min-w-0 resize-none overflow-y-auto border-0 bg-transparent px-2 py-2.5 text-[max(16px,0.95rem)] leading-relaxed text-slate-900 outline-none placeholder:text-slate-400 min-[600px]:order-3 min-[600px]:flex-1 min-[600px]:px-1 dark:text-zinc-100 dark:placeholder:text-zinc-500"
+                    />
+                    <div className="order-2 flex w-full items-center justify-between gap-2 min-[600px]:contents">
+                        <div className="flex items-center gap-1 min-[600px]:contents">
+                            <label
+                                htmlFor="chat-attach-input"
+                                className="flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-xl text-slate-500 hover:bg-slate-100 hover:text-slate-700 min-[600px]:order-1 dark:text-zinc-400 dark:hover:bg-white/[0.06] dark:hover:text-zinc-200"
+                            >
+                                <Paperclip className="h-[18px] w-[18px]" aria-hidden />
+                                <input
+                                    ref={fileInputRef}
+                                    id="chat-attach-input"
+                                    type="file"
+                                    multiple
+                                    className="hidden"
+                                    onChange={handleAttachFile}
+                                    disabled={
+                                        !canSendMessages
+                                                    || isSendingMessage
+                                                    || attachments.length >= MAX_ATTACHMENT_SLOTS
+                                    }
+                                />
+                            </label>
+                            <button
+                                type="button"
+                                onClick={() => setModelSheetOpen(true)}
+                                aria-label={modelSelectorLabel}
+                                title={modelSelectorLabel}
+                                className="group relative flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-slate-200/80 bg-white text-slate-800 shadow-sm transition hover:-translate-y-[1px] hover:bg-slate-50 hover:shadow min-[600px]:order-2 dark:border-white/[0.10] dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800"
+                            >
+                                <ProviderLogo provider={provider} size={20} />
+                                <span className="pointer-events-none absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border border-white bg-brand-500 dark:border-zinc-900" />
+                            </button>
+                        </div>
+                        <button
+                            type="submit"
+                            disabled={
+                                !canSendMessages
+                                            || isSendingMessage
+                                            || (currentMessage.trim() === ''
+                                                && attachments.length === 0)
+                            }
+                            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-brand-600 to-brand-400 text-white shadow-md shadow-brand-500/25 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:bg-none disabled:text-slate-400 disabled:shadow-none min-[600px]:order-4 dark:disabled:bg-zinc-800 dark:disabled:text-zinc-600"
+                            title={isSendingMessage ? 'Generating…' : 'Send'}
+                        >
+                            {isSendingMessage
+                                ? <Square className="h-4 w-4 fill-current" />
+                                : <ArrowUp className="h-4 w-4" />}
+                        </button>
+                    </div>
+                </form>
+            </>
+        )
+    }
 
     return (
         <div className="relative box-border flex min-h-0 w-full max-w-full flex-1 flex-col overflow-hidden">
@@ -528,7 +795,25 @@ function Chat({ currentChat }) {
                                 message.role === 'user' ? 'justify-end' : 'justify-start'
                             )}
                         >
-                            <MessageBubble message={message} />
+                            <MessageBubble
+                                message={message}
+                                onCopy={
+                                    message.role === 'user'
+                                        ? () => handleCopyPrompt(message.id)
+                                        : undefined
+                                }
+                                onRetry={
+                                    message.role === 'user'
+                                        ? () => handleRetryPrompt(message.id)
+                                        : undefined
+                                }
+                                onEdit={
+                                    message.role === 'user'
+                                        ? () => handleEditPrompt(message.id)
+                                        : undefined
+                                }
+                                actionsDisabled={isSendingMessage}
+                            />
                         </div>
                     ))}
 
@@ -579,134 +864,51 @@ function Chat({ currentChat }) {
                 )}
 
                 <div className={clsx(composerWidth, 'space-y-2')}>
-                    {canSendMessages ? (
-                        <>
-                            {attachments.length > 0 && (
-                                <div className="flex flex-wrap gap-2 pb-1">
-                                    {attachments.map((a) => (
-                                        <div
-                                            key={a.id}
-                                            className="group relative h-14 w-14 shrink-0 overflow-hidden rounded-xl border border-slate-200/90 bg-slate-100 dark:border-white/[0.12] dark:bg-zinc-800/80"
-                                        >
-                                            {a.previewUrl ? (
-                                                <img
-                                                    src={a.previewUrl}
-                                                    alt=""
-                                                    className="h-full w-full object-cover"
-                                                />
-                                            ) : (
-                                                <div className="flex h-full w-full flex-col items-center justify-center gap-0.5 px-1">
-                                                    <Paperclip className="h-4 w-4 shrink-0 text-slate-500 dark:text-zinc-400" aria-hidden />
-                                                    <span className="max-w-full truncate text-[9px] font-medium leading-tight text-slate-600 dark:text-zinc-300">
-                                                        {(a.file.name.split('.').pop() || 'file').slice(0, 6)}
-                                                    </span>
-                                                </div>
-                                            )}
-                                            {isMobileLayout && (
-                                                <button
-                                                    type="button"
-                                                    className="absolute inset-0 z-[1] rounded-xl bg-transparent active:bg-black/10"
-                                                    aria-label={`Remove ${a.file.name}`}
-                                                    onClick={() => removeAttachment(a.id)}
-                                                />
-                                            )}
-                                            <button
-                                                type="button"
-                                                className="absolute right-0.5 top-0.5 z-[2] flex h-6 w-6 items-center justify-center rounded-md bg-black/55 text-white opacity-0 shadow-md transition-opacity hover:bg-black/70 focus-visible:opacity-100 group-hover:opacity-100 max-[600px]:hidden"
-                                                aria-label={`Remove ${a.file.name}`}
-                                                onClick={() => removeAttachment(a.id)}
-                                            >
-                                                <X className="h-3.5 w-3.5" strokeWidth={2.5} aria-hidden />
-                                            </button>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-
-                            <form
-                                className="flex flex-col gap-2 rounded-[24px] border border-slate-200/90 bg-white p-2 shadow-lg shadow-slate-900/5 transition focus-within:border-brand-500 focus-within:ring-2 focus-within:ring-brand-500/20 min-[600px]:flex-row min-[600px]:items-end min-[600px]:gap-2 dark:border-white/[0.10] dark:bg-zinc-900 dark:shadow-black/40"
-                                onSubmit={(e) => {
-                                    e.preventDefault()
-                                    handleSendMessage()
-                                }}
-                            >
-                                <textarea
-                                    ref={composerRef}
-                                    rows={1}
-                                    placeholder="Ask anything..."
-                                    value={currentMessage}
-                                    onChange={(e) => setCurrentMessage(e.target.value)}
-                                    onKeyDown={handleKeyDown}
-                                    disabled={!canSendMessages}
-                                    className="scrollbar-none order-1 max-h-[240px] min-h-[44px] w-full min-w-0 resize-none overflow-y-auto border-0 bg-transparent px-2 py-2.5 text-[max(16px,0.95rem)] leading-relaxed text-slate-900 outline-none placeholder:text-slate-400 min-[600px]:order-3 min-[600px]:flex-1 min-[600px]:px-1 dark:text-zinc-100 dark:placeholder:text-zinc-500"
-                                />
-                                <div className="order-2 flex w-full items-center justify-between gap-2 min-[600px]:contents">
-                                    <div className="flex items-center gap-1 min-[600px]:contents">
-                                        <label
-                                            htmlFor="chat-attach-input"
-                                            className="flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-xl text-slate-500 hover:bg-slate-100 hover:text-slate-700 min-[600px]:order-1 dark:text-zinc-400 dark:hover:bg-white/[0.06] dark:hover:text-zinc-200"
-                                        >
-                                            <Paperclip className="h-[18px] w-[18px]" aria-hidden />
-                                            <input
-                                                ref={fileInputRef}
-                                                id="chat-attach-input"
-                                                type="file"
-                                                multiple
-                                                className="hidden"
-                                                onChange={handleAttachFile}
-                                                disabled={
-                                                    !canSendMessages
-                                                    || isSendingMessage
-                                                    || attachments.length >= MAX_ATTACHMENT_SLOTS
-                                                }
-                                            />
-                                        </label>
-                                        <button
-                                            type="button"
-                                            onClick={() => setModelSheetOpen(true)}
-                                            aria-label={modelSelectorLabel}
-                                            title={modelSelectorLabel}
-                                            className="group relative flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-slate-200/80 bg-white text-slate-800 shadow-sm transition hover:-translate-y-[1px] hover:bg-slate-50 hover:shadow min-[600px]:order-2 dark:border-white/[0.10] dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800"
-                                        >
-                                            <ProviderLogo provider={provider} size={20} />
-                                            <span className="pointer-events-none absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border border-white bg-brand-500 dark:border-zinc-900" />
-                                        </button>
-                                    </div>
-                                    <button
-                                        type="submit"
-                                        disabled={
-                                            !canSendMessages
-                                            || isSendingMessage
-                                            || (currentMessage.trim() === ''
-                                                && attachments.length === 0)
-                                        }
-                                        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-brand-600 to-brand-400 text-white shadow-md shadow-brand-500/25 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:bg-none disabled:text-slate-400 disabled:shadow-none min-[600px]:order-4 dark:disabled:bg-zinc-800 dark:disabled:text-zinc-600"
-                                        title={isSendingMessage ? 'Generating…' : 'Send'}
-                                    >
-                                        {isSendingMessage
-                                            ? <Square className="h-4 w-4 fill-current" />
-                                            : <ArrowUp className="h-4 w-4" />}
-                                    </button>
-                                </div>
-                            </form>
-                        </>
-                    ) : (
-                        <div className="rounded-2xl border border-slate-200/90 bg-white p-6 text-center dark:border-white/[0.10] dark:bg-zinc-900">
-                            <p className="text-sm text-slate-600 dark:text-zinc-400">
-                                You cannot send messages because no provider API key is saved.
-                                {' '}
-                                <button
-                                    type="button"
-                                    className="font-semibold text-brand-600 hover:underline dark:text-brand-400"
-                                    onClick={() => navigate('/user')}
-                                >
-                                    Add keys in settings.
-                                </button>
-                            </p>
-                        </div>
-                    )}
+                    {renderComposerContent()}
                 </div>
             </div>
+
+            {editPromptState && (
+                <div className="fixed inset-0 z-[1400] flex items-center justify-center bg-black/50 p-4">
+                    <form
+                        onSubmit={handleEditPromptSubmit}
+                        className="w-full max-w-lg rounded-2xl border border-slate-200/80 bg-white p-6 shadow-xl dark:border-white/10 dark:bg-zinc-900"
+                    >
+                        <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
+                            Edit prompt
+                        </h2>
+                        <p className="mt-2 text-sm text-slate-600 dark:text-zinc-400">
+                            Update your message and regenerate the response from here.
+                        </p>
+                        <textarea
+                            ref={editPromptRef}
+                            required
+                            rows={6}
+                            value={editPromptState.draft}
+                            onChange={(e) => setEditPromptState((prev) => (
+                                prev ? { ...prev, draft: e.target.value } : prev
+                            ))}
+                            className="scrollbar-none mt-4 w-full resize-y rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-[16px] leading-relaxed text-slate-900 outline-none ring-brand-500/0 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 dark:border-white/10 dark:bg-zinc-950 dark:text-white sm:text-sm"
+                        />
+                        <div className="mt-4 flex justify-end gap-2">
+                            <button
+                                type="button"
+                                onClick={handleEditPromptCancel}
+                                className="rounded-[10px] px-4 py-2 text-sm font-medium text-slate-700 hover:bg-black/5 dark:text-zinc-300"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="submit"
+                                disabled={!editPromptState.draft.trim() || isSendingMessage}
+                                className="rounded-[10px] bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                                Save & resend
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            )}
         </div>
     )
 }

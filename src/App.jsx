@@ -28,6 +28,7 @@ function App() {
     const [user, setUser] = useState(
         () => JSON.parse(localStorage.getItem('frugalGptUser')) || null
     )
+    const [authReady, setAuthReady] = useState(false)
     const [userMenuOpen, setUserMenuOpen] = useState(false)
     const userMenuRef = useRef(null)
     const [open, setOpen] = useState(() => localStorage.getItem('frugalGptSidenav') !== 'false')
@@ -54,18 +55,26 @@ function App() {
 
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-            const redirectPaths = ['chats', 'user']
-            if (!currentUser && redirectPaths.includes(location.pathname.split('/')[1])) {
-                const intendedPath = location.pathname
-                navigate(`/signin?redirect=${encodeURIComponent(intendedPath)}`)
-            } else {
+            setAuthReady(true)
+            if (currentUser) {
                 setUser(currentUser)
                 localStorage.setItem('frugalGptUser', JSON.stringify(currentUser))
+            } else {
+                setUser(null)
+                localStorage.removeItem('frugalGptUser')
             }
         })
 
         return () => unsubscribe()
-    }, [location, navigate])
+    }, [])
+
+    useEffect(() => {
+        if (!authReady) return
+        const redirectPaths = ['chats', 'user']
+        if (!user && redirectPaths.includes(location.pathname.split('/')[1])) {
+            navigate(`/signin?redirect=${encodeURIComponent(location.pathname)}`)
+        }
+    }, [authReady, user, location.pathname, navigate])
 
     useEffect(() => {
         const closeOnOutside = (e) => {

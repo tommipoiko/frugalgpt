@@ -6,7 +6,7 @@ import {
 } from 'lucide-react'
 import clsx from 'clsx'
 import {
-    doc, getDoc, setDoc, deleteField
+    doc, getDoc, setDoc, deleteField, onSnapshot
 } from 'firebase/firestore'
 import { auth, db } from '../services/firebase'
 import useKeyboardOverlapBottom from '../hooks/useKeyboardOverlapBottom'
@@ -60,28 +60,41 @@ function User({ setMode }) {
     const [saving, setSaving] = useState(false)
 
     useEffect(() => {
-        const fetchUserSettings = async () => {
-            if (auth.currentUser) {
-                const docRef = doc(db, 'users', auth.currentUser.uid)
-                const docSnap = await getDoc(docRef)
-                if (docSnap.exists()) {
-                    const userData = docSnap.data()
-                    setProviders(hydrateProvidersFromDoc(userData))
-                }
-            }
-            setLoading(false)
-        }
+        let unsubSettings = () => {}
 
-        const unsubscribe = auth.onAuthStateChanged((user) => {
-            if (user) {
-                fetchUserSettings()
-            } else {
+        const unsubscribe = auth.onAuthStateChanged((currentUser) => {
+            unsubSettings()
+            if (!currentUser) {
                 setLoading(false)
                 setFeedback({ severity: 'warning', message: 'You are not signed in.' })
+                return
             }
+
+            setLoading(true)
+            setFeedback(null)
+            unsubSettings = onSnapshot(
+                doc(db, 'users', currentUser.uid),
+                (docSnap) => {
+                    if (docSnap.exists()) {
+                        setProviders(hydrateProvidersFromDoc(docSnap.data()))
+                    }
+                    setLoading(false)
+                },
+                (error) => {
+                    console.error('Failed to load user settings:', error)
+                    setLoading(false)
+                    setFeedback({
+                        severity: 'error',
+                        message: 'Could not load settings. Check your connection and try again.'
+                    })
+                }
+            )
         })
 
-        return () => unsubscribe()
+        return () => {
+            unsubscribe()
+            unsubSettings()
+        }
     }, [])
 
     const buildProvidersPayload = async () => {
